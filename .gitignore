@@ -1,0 +1,13 @@
+# Rust / Stylus build artifacts
+message-hub/target/
+
+# Foundry dependencies and build artifacts
+contracts/receiver/lib/
+contracts/receiver/out/
+contracts/receiver/cache/
+
+# Secrets
+.env
+
+# Generated deployment info
+deployment-info.json
