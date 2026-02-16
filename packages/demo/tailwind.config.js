@@ -1,0 +1,40 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'monospace'],
+      },
+      colors: {
+        brand: {
+          50:  '#eff6ff',
+          500: '#3b82f6',
+          600: '#2563eb',
+        },
+      },
+      animation: {
+        'pulse-slow':  'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'spin-slow':   'spin 12s linear infinite',
+        'flow':        'flow 3s ease-in-out infinite',
+        'glow':        'glow 2s ease-in-out infinite alternate',
+      },
+      keyframes: {
+        flow: {
+          '0%, 100%': { transform: 'translateX(0)', opacity: '0.4' },
+          '50%':      { transform: 'translateX(6px)', opacity: '1' },
+        },
+        glow: {
+          from: { boxShadow: '0 0 10px rgba(59, 130, 246, 0.3)' },
+          to:   { boxShadow: '0 0 30px rgba(59, 130, 246, 0.8)' },
+        },
+      },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'mesh':            'radial-gradient(at 40% 20%, hsla(228,100%,74%,0.1) 0px, transparent 50%), radial-gradient(at 80% 0%, hsla(189,100%,56%,0.1) 0px, transparent 50%), radial-gradient(at 0% 50%, hsla(355,100%,93%,0.05) 0px, transparent 50%)',
+      },
+    },
+  },
+  plugins: [],
+}
