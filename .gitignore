@@ -11,3 +11,7 @@ contracts/receiver/cache/
 
 # Generated deployment info
 deployment-info.json
+
+# SDK build output
+packages/sdk/dist/
+packages/sdk/node_modules/

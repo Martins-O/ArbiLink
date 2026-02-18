@@ -1,0 +1,37 @@
+{
+  "name": "@arbilink/sdk",
+  "version": "0.1.0",
+  "description": "Cross-chain messaging SDK for Arbitrum — send messages to any chain with one function call",
+  "keywords": ["arbitrum", "cross-chain", "messaging", "bridge", "stylus", "web3"],
+  "license": "MIT",
+  "author": "ArbiLink",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Martins-O/ArbiLink.git",
+    "directory": "packages/sdk"
+  },
+  "main":  "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "src"],
+  "scripts": {
+    "build":          "tsc --project tsconfig.json",
+    "build:watch":    "tsc --project tsconfig.json --watch",
+    "clean":          "rm -rf dist",
+    "type-check":     "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "dependencies": {
+    "ethers": "^6.9.0",
+    "viem":   "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript":  "^5.3.0"
+  },
+  "peerDependencies": {
+    "ethers": "^6.9.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
