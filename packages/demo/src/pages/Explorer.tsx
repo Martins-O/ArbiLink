@@ -1,0 +1,170 @@
+import { useState }     from 'react'
+import { motion }        from 'framer-motion'
+import { Search, Filter } from 'lucide-react'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+} from 'recharts'
+import MessageCard, { type MockMessage } from '@/components/MessageCard'
+import { cn } from '@/lib/utils'
+
+// ── Mock data ─────────────────────────────────────────────────────────────────
+
+const now = Math.floor(Date.now() / 1000)
+
+const MOCK_MESSAGES: MockMessage[] = [
+  { id: 1284n, sender: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', destinationChain: 11155111, target: '0x742d35Cc6634C0532925a3b844BC454e4438f44e', status: 'confirmed', feePaid: 1_000_000_000_000_000n, timestamp: now - 45,   demo: 'NFT Mint'        },
+  { id: 1283n, sender: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', destinationChain: 84532,    target: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', status: 'relayed',   feePaid: 800_000_000_000_000n,  timestamp: now - 120,  demo: 'Token Transfer'  },
+  { id: 1282n, sender: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', destinationChain: 11155111, target: '0x408ED6354d4973f66138C91495F2f2FCbd8724C3', status: 'confirmed', feePaid: 1_200_000_000_000_000n, timestamp: now - 360,  demo: 'DAO Vote'        },
+  { id: 1281n, sender: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', destinationChain: 84532,    target: '0x742d35Cc6634C0532925a3b844BC454e4438f44e', status: 'confirmed', feePaid: 950_000_000_000_000n,  timestamp: now - 720,  demo: 'NFT Mint'        },
+  { id: 1280n, sender: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', destinationChain: 11155111, target: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', status: 'failed',    feePaid: 800_000_000_000_000n,  timestamp: now - 1440, demo: 'Token Transfer'  },
+  { id: 1279n, sender: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', destinationChain: 84532,    target: '0x408ED6354d4973f66138C91495F2f2FCbd8724C3', status: 'confirmed', feePaid: 1_100_000_000_000_000n, timestamp: now - 2880, demo: 'DAO Vote'        },
+  { id: 1278n, sender: '0x976EA74026E726554dB657fA54763abd0C3a0aa9', destinationChain: 11155111, target: '0x742d35Cc6634C0532925a3b844BC454e4438f44e', status: 'confirmed', feePaid: 900_000_000_000_000n,  timestamp: now - 4320, demo: 'NFT Mint'        },
+  { id: 1277n, sender: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955', destinationChain: 84532,    target: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', status: 'pending',   feePaid: 800_000_000_000_000n,  timestamp: now - 30,   demo: 'Token Transfer'  },
+]
+
+const CHART_DATA = [
+  { day: 'Mon', count: 142 },
+  { day: 'Tue', count: 198 },
+  { day: 'Wed', count: 167 },
+  { day: 'Thu', count: 254 },
+  { day: 'Fri', count: 312 },
+  { day: 'Sat', count: 287 },
+  { day: 'Sun', count: 224 },
+]
+
+const STATUS_FILTERS = ['all', 'pending', 'relayed', 'confirmed', 'failed'] as const
+type Filter = typeof STATUS_FILTERS[number]
+
+// ── Page ──────────────────────────────────────────────────────────────────────
+
+export default function Explorer() {
+  const [filter, setFilter] = useState<Filter>('all')
+  const [search, setSearch] = useState('')
+
+  const filtered = MOCK_MESSAGES.filter(m => {
+    const matchFilter = filter === 'all' || m.status === filter
+    const matchSearch = search === '' ||
+      m.id.toString().includes(search) ||
+      m.sender.toLowerCase().includes(search.toLowerCase()) ||
+      m.demo.toLowerCase().includes(search.toLowerCase())
+    return matchFilter && matchSearch
+  })
+
+  return (
+    <div className="min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8"
+        >
+          <h1 className="text-3xl sm:text-4xl font-bold text-white mb-1">
+            Message <span className="gradient-text">Explorer</span>
+          </h1>
+          <p className="text-slate-400">Browse all cross-chain messages sent through ArbiLink</p>
+        </motion.div>
+
+        {/* Chart */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="glass rounded-2xl p-6 mb-6"
+        >
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="font-semibold text-white">Messages per day</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Last 7 days</p>
+            </div>
+            <span className="chain-badge text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+              +18% this week
+            </span>
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={CHART_DATA} barSize={28}>
+              <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip
+                contentStyle={{
+                  background: '#0f172a',
+                  border: '1px solid #1e293b',
+                  borderRadius: '10px',
+                  color: '#f1f5f9',
+                  fontSize: 13,
+                }}
+                cursor={{ fill: 'rgba(59,130,246,0.06)' }}
+              />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                {CHART_DATA.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={i === CHART_DATA.length - 1 ? '#6366f1' : '#3b82f6'}
+                    opacity={0.85}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </motion.div>
+
+        {/* Filters + search */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-col sm:flex-row gap-3 mb-5"
+        >
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by ID, sender, or type…"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/60 border border-slate-700 text-slate-200 placeholder:text-slate-600 text-sm focus:outline-none focus:border-blue-500/60 focus:ring-1 focus:ring-blue-500/30 transition-colors"
+            />
+          </div>
+
+          {/* Status filter */}
+          <div className="flex items-center gap-1 glass rounded-xl p-1">
+            <Filter className="w-4 h-4 text-slate-500 ml-2 shrink-0" />
+            {STATUS_FILTERS.map(f => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all',
+                  filter === f
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/60',
+                )}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Message list */}
+        <div className="space-y-3">
+          {filtered.length === 0 ? (
+            <div className="text-center py-16 text-slate-600">
+              <Search className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              No messages match your search
+            </div>
+          ) : (
+            filtered.map((msg, i) => (
+              <MessageCard key={msg.id.toString()} message={msg} index={i} />
+            ))
+          )}
+        </div>
+
+        <p className="text-center text-xs text-slate-700 mt-8">
+          Showing mock data — connect to Arbitrum Sepolia to see live messages
+        </p>
+      </div>
+    </div>
+  )
+}
