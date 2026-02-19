@@ -21,6 +21,16 @@ ok()   { echo -e "${GREEN}✅  $*${NC}"; }
 warn() { echo -e "${YELLOW}⚠️   $*${NC}"; }
 die()  { echo -e "${RED}❌  $*${NC}"; exit 1; }
 
+# ── Auto-load .env from repo root ─────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(dirname "$SCRIPT_DIR")"
+if [[ -f "${ROOT}/.env" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "${ROOT}/.env"
+    set +a
+fi
+
 # ── Banner ────────────────────────────────────────────────────────────────────
 echo ""
 echo "╔═══════════════════════════════════════╗"
@@ -31,9 +41,6 @@ echo ""
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
 [[ -z "${PRIVATE_KEY:-}" ]] && die "PRIVATE_KEY is not set"
 [[ -z "${INFURA_KEY:-}"  ]] && die "INFURA_KEY is not set"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(dirname "$SCRIPT_DIR")"
 
 # RPC endpoints
 ARB_SEPOLIA_RPC="https://sepolia-rollup.arbitrum.io/rpc"
