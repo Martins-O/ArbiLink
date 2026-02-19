@@ -47,10 +47,20 @@ CHALLENGE_PERIOD="300"            # 5 minutes
 # Signing key for the receiver (defaults to deployer)
 HUB_SIGNING_KEY="${HUB_SIGNING_KEY:-}"
 
+# ── Toolchain setup ───────────────────────────────────────────────────────────
+# The system cargo may not understand +toolchain flags; resolve the 1.88.0
+# toolchain bin directory from rustup and prepend it to PATH.
+TOOLCHAIN_BIN="$(rustup run 1.88.0 rustc --print sysroot 2>/dev/null)/bin"
+if [[ -d "${TOOLCHAIN_BIN}" ]]; then
+    export PATH="${TOOLCHAIN_BIN}:${PATH}"
+else
+    warn "Could not locate Rust 1.88.0 toolchain via rustup – falling back to system cargo"
+fi
+
 # ── Step 1: Build Stylus WASM ─────────────────────────────────────────────────
 echo "📦  Building MessageHub WASM..."
 pushd "${ROOT}/message-hub" > /dev/null
-cargo +1.88.0 build --release --target wasm32-unknown-unknown 2>&1 | \
+cargo build --release --target wasm32-unknown-unknown 2>&1 | \
     grep -E "Compiling|Finished|error" || true
 popd > /dev/null
 ok "WASM built"
@@ -60,7 +70,7 @@ echo ""
 echo "🚀  Deploying MessageHub to Arbitrum Sepolia..."
 
 # cargo stylus deploy returns the contract address on stdout
-MESSAGE_HUB=$(cargo +1.88.0 stylus deploy \
+MESSAGE_HUB=$(cargo stylus deploy \
     --private-key="${PRIVATE_KEY}" \
     --endpoint="${ARB_SEPOLIA_RPC}" \
     --no-verify \
