@@ -76,14 +76,19 @@ ok "WASM built"
 echo ""
 echo "🚀  Deploying MessageHub to Arbitrum Sepolia..."
 
-# cargo stylus deploy returns the contract address on stdout
-MESSAGE_HUB=$(cargo stylus deploy \
+# Must run from inside the crate directory; tee shows output live and saves it
+TMPFILE=$(mktemp)
+pushd "${ROOT}/message-hub" > /dev/null
+cargo stylus deploy \
     --private-key="${PRIVATE_KEY}" \
     --endpoint="${ARB_SEPOLIA_RPC}" \
     --no-verify \
-    "${ROOT}/message-hub" 2>&1 | grep -oE '0x[a-fA-F0-9]{40}' | tail -1)
+    2>&1 | tee "${TMPFILE}"
+popd > /dev/null
 
-[[ -z "${MESSAGE_HUB}" ]] && die "MessageHub deployment failed"
+MESSAGE_HUB=$(grep -oE '0x[a-fA-F0-9]{40}' "${TMPFILE}" | tail -1)
+rm -f "${TMPFILE}"
+[[ -z "${MESSAGE_HUB}" ]] && die "MessageHub deployment failed — no address found in output"
 ok "MessageHub deployed: ${MESSAGE_HUB}"
 
 # ── Step 3: Initialise MessageHub ─────────────────────────────────────────────
@@ -114,14 +119,16 @@ popd > /dev/null
 # ── Step 5: Deploy Receiver to Ethereum Sepolia ───────────────────────────────
 echo ""
 echo "🚀  Deploying ArbiLinkReceiver to Ethereum Sepolia..."
-ETH_OUTPUT=$(forge create \
+TMPFILE_ETH=$(mktemp)
+forge create \
     --rpc-url="${ETH_SEPOLIA_RPC}" \
     --private-key="${PRIVATE_KEY}" \
-    --broadcast \
     "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver" \
-    --constructor-args "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}" 2>&1)
+    --constructor-args "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}" \
+    2>&1 | tee "${TMPFILE_ETH}"
 
-ETH_RECEIVER=$(echo "${ETH_OUTPUT}" | grep "Deployed to:" | awk '{print $3}')
+ETH_RECEIVER=$(grep "Deployed to:" "${TMPFILE_ETH}" | awk '{print $3}')
+rm -f "${TMPFILE_ETH}"
 [[ -z "${ETH_RECEIVER}" ]] && die "ETH Receiver deployment failed"
 ok "ETH Receiver deployed: ${ETH_RECEIVER}"
 
@@ -138,14 +145,16 @@ ok "Ethereum Sepolia registered"
 # ── Step 6: Deploy Receiver to Base Sepolia ───────────────────────────────────
 echo ""
 echo "🚀  Deploying ArbiLinkReceiver to Base Sepolia..."
-BASE_OUTPUT=$(forge create \
+TMPFILE_BASE=$(mktemp)
+forge create \
     --rpc-url="${BASE_SEPOLIA_RPC}" \
     --private-key="${PRIVATE_KEY}" \
-    --broadcast \
     "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver" \
-    --constructor-args "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}" 2>&1)
+    --constructor-args "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}" \
+    2>&1 | tee "${TMPFILE_BASE}"
 
-BASE_RECEIVER=$(echo "${BASE_OUTPUT}" | grep "Deployed to:" | awk '{print $3}')
+BASE_RECEIVER=$(grep "Deployed to:" "${TMPFILE_BASE}" | awk '{print $3}')
+rm -f "${TMPFILE_BASE}"
 [[ -z "${BASE_RECEIVER}" ]] && die "Base Receiver deployment failed"
 ok "Base Receiver deployed: ${BASE_RECEIVER}"
 
