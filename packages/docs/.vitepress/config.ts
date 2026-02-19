@@ -94,6 +94,7 @@ export default defineConfig({
         {
           text: 'API Reference',
           items: [
+            { text: 'Overview',        link: '/api/' },
             { text: 'Smart Contracts', link: '/api/contracts' },
             { text: 'Events',          link: '/api/events' },
             { text: 'Architecture',    link: '/api/architecture' },
@@ -105,6 +106,7 @@ export default defineConfig({
         {
           text: 'Resources',
           items: [
+            { text: 'Overview',        link: '/resources/' },
             { text: 'FAQ',             link: '/resources/faq' },
             { text: 'Troubleshooting', link: '/resources/troubleshooting' },
             { text: 'Support',         link: '/resources/support' },
