@@ -3,15 +3,11 @@ name = "message-hub"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "message-hub"
-path = "src/main.rs"
-
 [lib]
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-stylus-sdk       = { version = "0.10.0", features = ["export-abi"] }
+stylus-sdk       = { version = "0.10.0" }
 # Must match the versions stylus-sdk 0.10 locks to (alloy 1.x)
 alloy-primitives = { version = "1.3", default-features = false }
 alloy-sol-types  = { version = "1.3", default-features = false }
