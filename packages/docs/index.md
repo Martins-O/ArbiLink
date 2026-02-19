@@ -14,7 +14,7 @@ hero:
       link: /getting-started/
     - theme: alt
       text: View Demo
-      link: https://demo.arbilink.dev
+      link: __DEMO_URL__
     - theme: alt
       text: GitHub
       link: https://github.com/Martins-O/ArbiLink

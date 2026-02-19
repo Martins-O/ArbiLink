@@ -1,4 +1,7 @@
-import { defineConfig } from 'vitepress'
+import { defineConfig, loadEnv } from 'vitepress'
+
+const env     = loadEnv('', process.cwd(), '')
+const demoUrl = env.VITE_DEMO_URL ?? 'https://demo.arbilink.dev'
 
 export default defineConfig({
   title: 'ArbiLink',
@@ -31,7 +34,7 @@ export default defineConfig({
         text: 'v0.1.0',
         items: [
           { text: 'GitHub',    link: 'https://github.com/Martins-O/ArbiLink' },
-          { text: 'Live Demo', link: 'https://demo.arbilink.dev' },
+          { text: 'Live Demo', link: demoUrl },
         ],
       },
     ],
@@ -133,5 +136,23 @@ export default defineConfig({
   markdown: {
     theme: 'github-dark',
     lineNumbers: true,
+  },
+
+  vite: {
+    define: {
+      __DEMO_URL__: JSON.stringify(demoUrl),
+    },
+  },
+
+  // Rewrite __DEMO_URL__ in frontmatter hero actions at build time
+  transformPageData(pageData) {
+    if (pageData.frontmatter?.hero?.actions) {
+      pageData.frontmatter.hero.actions = pageData.frontmatter.hero.actions.map(
+        (action: { link: string; [key: string]: unknown }) => ({
+          ...action,
+          link: action.link === '__DEMO_URL__' ? demoUrl : action.link,
+        }),
+      )
+    }
   },
 })

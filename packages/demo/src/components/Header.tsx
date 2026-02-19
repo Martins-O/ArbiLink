@@ -4,7 +4,7 @@ const NAV_LINKS = [
   { to: '/',         label: 'Home',     internal: true  },
   { to: '/demo',     label: 'Demo',     internal: true  },
   { to: '/explorer', label: 'Explorer', internal: true  },
-  { to: 'http://localhost:5174',      label: 'Docs',   internal: false },
+  { to: import.meta.env.VITE_DOCS_URL ?? 'https://docs.arbilink.dev', label: 'Docs', internal: false },
   { to: 'https://github.com/Martins-O/ArbiLink', label: 'GitHub', internal: false },
 ];
 
