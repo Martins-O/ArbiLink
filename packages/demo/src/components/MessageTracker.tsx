@@ -1,185 +1,154 @@
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Circle, Loader2, XCircle, ArrowRight } from 'lucide-react'
-import { cn, fmtId, shortAddress } from '@/lib/utils'
-
-export type SimStep = 0 | 1 | 2 | 3 | 4
-
-export interface TrackedMessage {
-  id:              bigint
-  sender?:         string
-  destinationChain: number
-  step:            SimStep   // 0=idle 1=sent 2=relayed 3=submitted 4=confirmed
-  failed?:         boolean
-  txHash?:         string
-}
-
-interface StepDef {
-  label:     string
-  sublabel:  string
-  chain:     string
-}
-
-const STEPS: StepDef[] = [
-  { label: 'Message Sent',           sublabel: 'Transaction confirmed on Arbitrum',       chain: 'Arbitrum Sepolia' },
-  { label: 'Relayer Picked Up',      sublabel: 'Off-chain relayer detected the event',     chain: 'Off-chain'        },
-  { label: 'Submitted to Chain',     sublabel: 'Relayer called receiveMessage()',          chain: 'Destination'      },
-  { label: 'Executed & Confirmed',   sublabel: 'Challenge window closed — finalized',      chain: 'Arbitrum Sepolia' },
-]
-
-const STEP_PROGRESS = [0, 28, 58, 82, 100]
+import { motion } from 'framer-motion';
+import { CheckCircle2, Clock, Loader2, Send } from 'lucide-react';
+import type { SimulationStep } from '../lib/types';
 
 interface MessageTrackerProps {
-  message: TrackedMessage | null
+  messageId: string;
+  steps: SimulationStep[];
+  progress: number;
+  destination: string;
 }
 
-export default function MessageTracker({ message }: MessageTrackerProps) {
-  const [elapsed, setElapsed] = useState(0)
-
-  useEffect(() => {
-    if (!message || message.step === 4 || message.failed) return
-    const t = setInterval(() => setElapsed(s => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [message])
-
-  useEffect(() => {
-    if (message) setElapsed(0)
-  }, [message?.id])
-
-  if (!message) {
-    return (
-      <div className="flex flex-col items-center justify-center h-80 text-slate-600 gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-slate-800/60 flex items-center justify-center">
-          <ArrowRight className="w-8 h-8" />
-        </div>
-        <p className="text-center text-sm">Send a message to see live tracking</p>
-      </div>
-    )
-  }
-
-  const progress = message.failed ? 100 : STEP_PROGRESS[message.step]
-  const isDone   = message.step === 4 || !!message.failed
+export function MessageTracker({
+  messageId,
+  steps,
+  progress,
+  destination,
+}: MessageTrackerProps) {
+  const done = progress >= 100;
 
   return (
     <div className="space-y-6">
 
+      {/* Message ID + status badge */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xs text-slate-500 mb-0.5">Message ID</p>
+          <span className="text-white font-mono font-bold text-lg">{messageId}</span>
+        </div>
+        {done && (
+          <motion.span
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-1.5 px-3 py-1 bg-green-500/15 border border-green-500/40 rounded-full text-green-400 text-xs font-semibold"
+          >
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Delivered
+          </motion.span>
+        )}
+      </div>
+
       {/* Progress bar */}
       <div>
-        <div className="flex justify-between text-xs text-slate-500 mb-2">
-          <span>Progress</span>
-          <span>{progress}%</span>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs text-slate-500">Progress</span>
+          <span className="text-xs font-mono text-slate-400">{Math.round(progress)}%</span>
         </div>
-        <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden">
           <motion.div
-            className={cn(
-              'h-full rounded-full',
-              message.failed
-                ? 'bg-red-500'
-                : 'bg-gradient-to-r from-blue-500 to-violet-500',
-            )}
+            className={`h-full rounded-full ${done ? 'bg-gradient-to-r from-green-500 to-emerald-400' : 'gradient-brand'}`}
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </div>
       </div>
 
       {/* Steps */}
-      <div className="space-y-2">
-        {STEPS.map((s, i) => {
-          const stepNum  = (i + 1) as SimStep
-          const complete = message.step > stepNum - 1 && !message.failed
-          const active   = message.step === stepNum - 1 && !isDone
-          const failed   = message.failed && i === message.step - 1
+      <div className="space-y-3">
+        {steps.map((step, i) => {
+          const isComplete = step.status === 'complete';
+          const isActive   = step.status === 'active';
 
           return (
             <motion.div
               key={i}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06 }}
-              className={cn(
-                'flex items-start gap-3 p-3.5 rounded-xl border transition-all duration-300',
-                complete  && 'border-emerald-500/40 bg-emerald-950/20',
-                active    && 'border-blue-500/60 bg-blue-950/30',
-                failed    && 'border-red-500/40 bg-red-950/20',
-                !complete && !active && !failed && 'border-slate-800/60 bg-slate-900/30',
-              )}
+              className={`flex items-start gap-4 p-4 rounded-xl border-2 transition-all duration-300 ${
+                isComplete ? 'status-complete'
+                : isActive  ? 'status-active'
+                : 'status-pending'
+              }`}
             >
               {/* Icon */}
-              <div className={cn(
-                'mt-0.5 shrink-0',
-                complete ? 'text-emerald-400' : active ? 'text-blue-400' : failed ? 'text-red-400' : 'text-slate-600',
-              )}>
-                {failed   ? <XCircle   className="w-5 h-5" /> :
-                 complete ? <CheckCircle2 className="w-5 h-5" /> :
-                 active   ? <Loader2   className="w-5 h-5 animate-spin" /> :
-                            <Circle    className="w-5 h-5" />}
+              <div className="mt-0.5 shrink-0">
+                {isComplete && <CheckCircle2 className="w-5 h-5" />}
+                {isActive   && <Loader2 className="w-5 h-5 animate-spin" />}
+                {!isComplete && !isActive && <Clock className="w-5 h-5" />}
               </div>
 
-              {/* Text */}
+              {/* Content */}
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm text-white">{s.label}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{s.sublabel}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-sm text-white">{step.label}</span>
+                  {step.time && (
+                    <span className="text-xs text-slate-500 font-mono shrink-0">{step.time}</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{step.description}</p>
               </div>
-
-              {/* Chain badge */}
-              <span className="chain-badge shrink-0 text-slate-400">{s.chain}</span>
             </motion.div>
-          )
+          );
         })}
       </div>
 
-      {/* Message details */}
-      <AnimatePresence>
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="glass rounded-xl p-4 space-y-2.5 text-sm"
-        >
-          <div className="flex justify-between">
-            <span className="text-slate-500">Message ID</span>
-            <span className="font-mono text-white">{fmtId(message.id)}</span>
-          </div>
-          {message.sender && (
-            <div className="flex justify-between">
-              <span className="text-slate-500">Sender</span>
-              <span className="font-mono text-white">{shortAddress(message.sender)}</span>
-            </div>
-          )}
-          <div className="flex justify-between">
-            <span className="text-slate-500">Destination</span>
-            <span className="text-white">
-              {message.destinationChain === 11155111 ? 'Ethereum Sepolia' : 'Base Sepolia'}
-            </span>
-          </div>
-          {message.txHash && (
-            <div className="flex justify-between">
-              <span className="text-slate-500">Tx Hash</span>
-              <a
-                href={`https://sepolia.arbiscan.io/tx/${message.txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-blue-400 hover:text-blue-300 transition-colors"
-              >
-                {shortAddress(message.txHash)}↗
-              </a>
-            </div>
-          )}
-          {!isDone && (
-            <div className="flex justify-between">
-              <span className="text-slate-500">Elapsed</span>
-              <span className="text-white">{elapsed}s</span>
-            </div>
-          )}
-          {message.step === 4 && (
-            <div className="pt-1 border-t border-slate-800 flex items-center gap-2 text-emerald-400 font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              Message delivered successfully
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+      {/* Message details panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="glass-panel p-4 space-y-2.5 text-sm"
+      >
+        <div className="flex justify-between">
+          <span className="text-slate-400">Sender</span>
+          <span className="text-white font-mono">0xabc...def</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-400">Destination</span>
+          <span className="text-white capitalize">{destination}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-400">Target Contract</span>
+          <span className="text-white font-mono">0x742d...44e</span>
+        </div>
+        {progress > 25 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex justify-between"
+          >
+            <span className="text-slate-400">Relayer</span>
+            <span className="text-white font-mono">0x123...789</span>
+          </motion.div>
+        )}
+        {done && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="pt-2 border-t border-slate-700 flex items-center gap-2 text-green-400 font-semibold text-xs"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Message delivered successfully
+          </motion.div>
+        )}
+      </motion.div>
     </div>
-  )
+  );
+}
+
+/** Empty state shown before any message is sent */
+export function MessageTrackerEmpty() {
+  return (
+    <div className="flex flex-col items-center justify-center h-96 text-center">
+      <div className="w-20 h-20 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-4">
+        <Send className="w-10 h-10 text-slate-700" />
+      </div>
+      <p className="text-slate-500 text-lg font-medium">Send a message to see live tracking</p>
+      <p className="text-slate-600 text-sm mt-2">
+        Select a demo scenario and click "Send Cross-Chain Message"
+      </p>
+    </div>
+  );
 }
