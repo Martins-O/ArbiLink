@@ -51,15 +51,6 @@ export function Header() {
             )}
           </nav>
 
-          {/* CTA */}
-          <a
-            href="https://github.com/Martins-O/ArbiLink"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="button-primary text-sm py-2 px-5"
-          >
-            View on GitHub
-          </a>
         </div>
       </div>
     </header>
