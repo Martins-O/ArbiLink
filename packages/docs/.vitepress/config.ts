@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from 'vitepress'
 
 const env     = loadEnv('', process.cwd(), '')
-const demoUrl = env.VITE_DEMO_URL ?? 'https://demo.arbilink.dev'
+const demoUrl = env.VITE_DEMO_URL ?? 'https://arbi-link-demo.vercel.app'
 
 export default defineConfig({
   title: 'ArbiLink',
