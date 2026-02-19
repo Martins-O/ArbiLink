@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-slate-700;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased;
+    min-height: 100vh;
+  }
+
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { @apply bg-slate-950; }
+  ::-webkit-scrollbar-thumb  { @apply bg-slate-700 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-600; }
+}
+
+@layer components {
+  .gradient-brand {
+    @apply bg-gradient-to-r from-blue-600 to-purple-600;
+  }
+
+  .gradient-bg {
+    @apply bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950;
+  }
+
+  .glass-panel {
+    @apply bg-slate-900/50 backdrop-blur-lg border border-slate-800 rounded-2xl;
+  }
+
+  .button-primary {
+    @apply px-6 py-3 gradient-brand hover:from-blue-700 hover:to-purple-700
+           rounded-xl font-bold text-white transition-all
+           shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40
+           disabled:from-slate-700 disabled:to-slate-700
+           disabled:cursor-not-allowed disabled:shadow-none;
+  }
+
+  .status-complete {
+    @apply border-green-500 bg-green-950/20 text-green-400;
+  }
+
+  .status-active {
+    @apply border-blue-500 bg-blue-950/20 text-blue-400 shadow-lg shadow-blue-500/10;
+  }
+
+  .status-pending {
+    @apply border-slate-700 bg-slate-800/30 text-slate-600;
+  }
+
+  /* legacy aliases kept for Home / Explorer pages */
+  .glass {
+    @apply glass-panel;
+  }
+
+  .btn-primary {
+    @apply button-primary;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+
+  .chain-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium
+           bg-slate-800 border border-slate-700;
+  }
+}

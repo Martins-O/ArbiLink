@@ -15,3 +15,11 @@ deployment-info.json
 # SDK build output
 packages/sdk/dist/
 packages/sdk/node_modules/
+
+# Demo build output
+packages/demo/dist/
+packages/demo/node_modules/
+packages/demo/.env
+
+# Root workspace node_modules (pnpm hoisted store)
+node_modules/

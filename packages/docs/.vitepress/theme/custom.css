@@ -1,0 +1,191 @@
+/**
+ * ArbiLink Documentation — Custom VitePress Theme
+ */
+
+:root {
+  --vp-c-brand-1: #3b82f6;
+  --vp-c-brand-2: #2563eb;
+  --vp-c-brand-3: #1d4ed8;
+  --vp-c-brand-soft: rgba(59, 130, 246, 0.1);
+
+  --arbilink-purple:  #8b5cf6;
+  --arbilink-cyan:    #06b6d4;
+  --arbilink-green:   #10b981;
+  --arbilink-yellow:  #f59e0b;
+  --arbilink-red:     #ef4444;
+
+  --arbilink-gradient:        linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --arbilink-gradient-subtle: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08));
+
+  --vp-layout-max-width: 1440px;
+}
+
+/* ── Global ──────────────────────────────────────────── */
+html { scroll-behavior: smooth; }
+
+/* ── Hero ────────────────────────────────────────────── */
+.VPHero .name {
+  background: var(--arbilink-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 900;
+}
+
+/* ── Feature cards ───────────────────────────────────── */
+.VPFeature {
+  border: 2px solid rgba(59, 130, 246, 0.2) !important;
+  border-radius: 12px !important;
+  transition: all 0.25s ease;
+  background: var(--arbilink-gradient-subtle) !important;
+}
+.VPFeature:hover {
+  border-color: var(--vp-c-brand-1) !important;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.15);
+}
+
+/* ── Code blocks ─────────────────────────────────────── */
+div[class*='language-'] {
+  border-radius: 10px !important;
+  border: 1px solid rgba(59, 130, 246, 0.25) !important;
+  overflow: hidden;
+  position: relative;
+}
+div[class*='language-']::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--arbilink-gradient);
+  z-index: 1;
+}
+
+/* ── Inline code ─────────────────────────────────────── */
+:not(pre) > code {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: var(--vp-c-brand-1) !important;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 5px;
+  font-weight: 600;
+}
+
+/* ── Tables ──────────────────────────────────────────── */
+.vp-doc table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid rgba(59, 130, 246, 0.2);
+  width: 100%;
+  margin: 1.5rem 0;
+}
+.vp-doc thead { background: rgba(59, 130, 246, 0.08); }
+.vp-doc thead th {
+  padding: 0.85rem 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.8rem;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.2);
+}
+.vp-doc tbody td { padding: 0.85rem 1rem; }
+.vp-doc tbody tr:last-child td { border-bottom: none; }
+.vp-doc tbody tr:hover { background: rgba(59, 130, 246, 0.04); }
+.vp-doc tbody td:first-child {
+  font-family: var(--vp-font-family-mono);
+  color: var(--vp-c-brand-1);
+  font-weight: 600;
+}
+
+/* ── Custom blocks ───────────────────────────────────── */
+.custom-block.tip    { background: rgba(16, 185, 129, 0.08); border-left-color: var(--arbilink-green); }
+.custom-block.warning{ background: rgba(245,158,11,0.08);    border-left-color: var(--arbilink-yellow); }
+.custom-block.danger { background: rgba(239,68,68,0.08);     border-left-color: var(--arbilink-red); }
+.custom-block.tip    .custom-block-title { color: var(--arbilink-green); }
+.custom-block.warning .custom-block-title { color: var(--arbilink-yellow); }
+.custom-block.danger  .custom-block-title { color: var(--arbilink-red); }
+
+/* ── Sidebar ─────────────────────────────────────────── */
+.VPSidebarItem.is-active > .item .link { color: var(--vp-c-brand-1) !important; font-weight: 700; }
+
+/* ── Navbar title gradient ───────────────────────────── */
+.VPNavBarTitle .title {
+  font-weight: 800;
+  background: var(--arbilink-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Buttons ─────────────────────────────────────────── */
+.VPButton.brand {
+  background: var(--arbilink-gradient) !important;
+  border-color: transparent !important;
+  transition: all 0.2s;
+}
+.VPButton.brand:hover { box-shadow: 0 8px 20px rgba(59,130,246,0.35); transform: translateY(-2px); }
+.VPButton.alt { border: 2px solid rgba(59,130,246,0.5) !important; }
+.VPButton.alt:hover { background: rgba(59,130,246,0.1) !important; }
+
+/* ── Comparison cards ────────────────────────────────── */
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+.comparison-card {
+  padding: 1.75rem;
+  border-radius: 12px;
+  border: 2px solid;
+  transition: transform 0.25s;
+}
+.comparison-card:hover { transform: translateY(-4px); }
+.comparison-card.bad  { background: rgba(239,68,68,0.07);   border-color: rgba(239,68,68,0.3); }
+.comparison-card.good { background: rgba(16,185,129,0.07);  border-color: rgba(16,185,129,0.3); }
+.comparison-card h3 { margin: 0 0 1rem; font-size: 1.2rem; }
+.comparison-card ul { list-style: none; padding: 0; margin: 0; }
+.comparison-card li { padding: 0.4rem 0; }
+
+/* ── CTA grid ────────────────────────────────────────── */
+.cta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.25rem;
+  margin: 2rem 0;
+}
+.cta-card {
+  display: block;
+  padding: 1.5rem;
+  background: var(--arbilink-gradient-subtle);
+  border: 2px solid rgba(59,130,246,0.25);
+  border-radius: 12px;
+  text-decoration: none !important;
+  transition: all 0.25s;
+}
+.cta-card:hover { transform: translateY(-4px); border-color: var(--vp-c-brand-1); box-shadow: 0 10px 24px rgba(59,130,246,0.18); }
+.cta-card h3 { margin: 0 0 0.4rem; color: var(--vp-c-brand-1) !important; font-size: 1.1rem; }
+.cta-card p  { margin: 0; opacity: 0.8; font-size: 0.9rem; }
+
+/* ── Status diagram ──────────────────────────────────── */
+.status-diagram {
+  background: rgba(59,130,246,0.07);
+  border-left: 4px solid var(--vp-c-brand-1);
+  padding: 1.25rem 1.5rem;
+  margin: 1.5rem 0;
+  border-radius: 0 8px 8px 0;
+  font-family: var(--vp-font-family-mono);
+  font-size: 0.9rem;
+  line-height: 1.8;
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+.VPFooter { border-top: 1px solid rgba(59,130,246,0.12); }
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .VPHero .name { font-size: 2.5rem !important; }
+  .comparison-grid, .cta-grid { grid-template-columns: 1fr; }
+  .vp-doc thead th, .vp-doc tbody td { padding: 0.65rem 0.75rem; font-size: 0.875rem; }
+}
