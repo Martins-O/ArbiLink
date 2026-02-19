@@ -119,11 +119,6 @@ export default defineConfig({
       copyright: 'Copyright © 2026 ArbiLink',
     },
 
-    editLink: {
-      pattern: 'https://github.com/Martins-O/ArbiLink/edit/indev/packages/docs/:path',
-      text: 'Edit this page on GitHub',
-    },
-
     search: {
       provider: 'local',
       options: { detailedView: true },
