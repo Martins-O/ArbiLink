@@ -20,3 +20,6 @@ packages/sdk/node_modules/
 packages/demo/dist/
 packages/demo/node_modules/
 packages/demo/.env
+
+# Root workspace node_modules (pnpm hoisted store)
+node_modules/
