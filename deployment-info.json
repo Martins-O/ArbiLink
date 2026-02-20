@@ -1,0 +1,31 @@
+{
+  "deployedAt": "2026-02-19",
+  "contracts": {
+    "messageHub": {
+      "address": "0x9c51691bD700B81d2dc50e9A7b5011c4acD8CD5f",
+      "chain": "Arbitrum Sepolia",
+      "chainId": 421614,
+      "deployTx": "0x9c6a0b60c0085bc45359499213c34877a3ecc6af2e83dc4e6ac58d4a37a36fe6",
+      "activationTx": "0x266797ba895f3ebfd0757067d06395183b31af9e20b5e2da922bcfefa75b6a02",
+      "initTx": "0x1e0f402edab60ba341b024aa1a24021d4113a744d0dcd32b022699a84eb45644",
+      "minStake": "1000000000000000000",
+      "challengePeriod": 300
+    },
+    "receivers": {
+      "baseSepolia": {
+        "address": "0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35",
+        "chain": "Base Sepolia",
+        "chainId": 84532,
+        "deployTx": "0x009060ed97e29259b1ac90d2d8ca9406e5d2da8e34a5ebc1c63b491ea0e16574",
+        "registeredInHubTx": "0x64183524835a78db63545df0761f0af2bc2c94718aada6b53d28f219a0d8b06f",
+        "baseFee": "1000000000000000"
+      },
+      "ethSepolia": {
+        "address": "0x0000000000000000000000000000000000000000",
+        "chain": "Ethereum Sepolia",
+        "chainId": 11155111,
+        "note": "Not deployed — deployer wallet has no ETH Sepolia funds"
+      }
+    }
+  }
+}

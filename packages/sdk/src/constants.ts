@@ -4,12 +4,12 @@ import type { ChainConfig, ChainName } from './types';
 // Fill these in after running scripts/deploy.sh
 
 /** MessageHub deployed on Arbitrum Sepolia (421614) */
-export const MESSAGE_HUB_ADDRESS = '0x0000000000000000000000000000000000000000';
+export const MESSAGE_HUB_ADDRESS = '0x9c51691bD700B81d2dc50e9A7b5011c4acD8CD5f';
 
 /** ArbiLinkReceiver addresses on each destination chain */
 export const RECEIVER_ADDRESSES: Record<number, string> = {
-  11155111: '0x0000000000000000000000000000000000000000', // Ethereum Sepolia
-  84532:    '0x0000000000000000000000000000000000000000', // Base Sepolia
+  11155111: '0x0000000000000000000000000000000000000000', // Ethereum Sepolia (not yet funded)
+  84532:    '0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35', // Base Sepolia
 };
 
 // ── Supported chains ──────────────────────────────────────────────────────────
