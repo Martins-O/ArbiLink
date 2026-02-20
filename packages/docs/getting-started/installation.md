@@ -10,16 +10,20 @@
 
 ::: code-group
 
-```bash [npm]
-npm install @arbilink/sdk ethers
-```
-
-```bash [pnpm]
+```sh [pnpm]
 pnpm add @arbilink/sdk ethers
 ```
 
-```bash [yarn]
+```sh [npm]
+npm install @arbilink/sdk ethers
+```
+
+```sh [yarn]
 yarn add @arbilink/sdk ethers
+```
+
+```sh [bun]
+bun add @arbilink/sdk ethers
 ```
 
 :::

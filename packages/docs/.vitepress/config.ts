@@ -30,6 +30,7 @@ export default defineConfig({
       { text: 'SDK',             link: '/sdk/' },
       { text: 'Guides',          link: '/guides/' },
       { text: 'Examples',        link: '/examples/' },
+      { text: 'API',             link: '/api/' },
       {
         text: 'v0.1.0',
         items: [
