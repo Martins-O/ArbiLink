@@ -1,6 +1,6 @@
 {
-  "buildCommand": "pnpm run build",
-  "outputDirectory": "dist",
+  "buildCommand": "cd ../.. && pnpm --filter @arbilink/sdk build && pnpm --filter @arbilink/demo build",
+  "outputDirectory": "packages/demo/dist",
   "framework": "vite",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
