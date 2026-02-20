@@ -3,7 +3,11 @@ import { motion }               from 'framer-motion'
 import { JsonRpcProvider, Contract } from 'ethers'
 import { Zap, Globe, Clock, TrendingDown } from 'lucide-react'
 import MessageHubABI from '../../../sdk/src/abi/MessageHub.json'
-import { MESSAGE_HUB_ADDRESS, ARBITRUM_SEPOLIA_RPC } from '@arbilink/sdk'
+import { MESSAGE_HUB_ADDRESS } from '@arbilink/sdk'
+
+const ARBITRUM_SEPOLIA_RPC = import.meta.env.VITE_INFURA_KEY
+  ? `https://arbitrum-sepolia.infura.io/v3/${import.meta.env.VITE_INFURA_KEY}`
+  : 'https://sepolia-rollup.arbitrum.io/rpc'
 
 interface Stat {
   label:  string

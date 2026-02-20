@@ -4,7 +4,11 @@ import { arbitrumSepolia } from 'wagmi/chains';
 import { ethers, JsonRpcProvider, Contract, Interface } from 'ethers';
 import { walletClientToSigner } from '../lib/utils';
 import MessageHubABI from '../../../sdk/src/abi/MessageHub.json';
-import { MESSAGE_HUB_ADDRESS, ARBITRUM_SEPOLIA_RPC } from '@arbilink/sdk';
+import { MESSAGE_HUB_ADDRESS } from '@arbilink/sdk';
+
+const ARBITRUM_SEPOLIA_RPC = import.meta.env.VITE_INFURA_KEY
+  ? `https://arbitrum-sepolia.infura.io/v3/${import.meta.env.VITE_INFURA_KEY}`
+  : 'https://sepolia-rollup.arbitrum.io/rpc';
 import type { SimulationStep } from '../lib/types';
 
 const HUB_ABI = [

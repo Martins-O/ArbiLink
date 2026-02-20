@@ -224,7 +224,9 @@ async function main(): Promise<void> {
   // ── Load env ──────────────────────────────────────────────────────────────
   const relayerKey    = requireEnv('PRIVATE_KEY');
   const signingKey    = process.env.HUB_SIGNING_KEY ?? relayerKey;
-  const arbRpc        = 'https://sepolia-rollup.arbitrum.io/rpc';
+  const arbRpc        = process.env.INFURA_KEY
+    ? `https://arbitrum-sepolia.infura.io/v3/${process.env.INFURA_KEY}`
+    : 'https://sepolia-rollup.arbitrum.io/rpc';
 
   const arbProvider    = new ethers.JsonRpcProvider(arbRpc);
   const relayerWallet  = new ethers.Wallet(relayerKey, arbProvider);
