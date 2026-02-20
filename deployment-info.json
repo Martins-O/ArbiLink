@@ -21,10 +21,18 @@
         "baseFee": "1000000000000000"
       },
       "ethSepolia": {
-        "address": "0x0000000000000000000000000000000000000000",
+        "address": "0x895058E57bBE8c84C2AABA5d61c4C739C5869F71",
         "chain": "Ethereum Sepolia",
         "chainId": 11155111,
-        "note": "Not deployed — deployer wallet has no ETH Sepolia funds"
+        "registeredInHubTx": "0x25967b0442c086f4e9e252b7b917f56fee3572afdfb6d92ed43a127c1c31e03b",
+        "baseFee": "1000000000000000"
+      },
+      "polygonAmoy": {
+        "address": "0x221B7Cca1C385C6c81e17b086C753328AF41AAAa",
+        "chain": "Polygon Amoy",
+        "chainId": 80002,
+        "registeredInHubTx": "0x81d90486075bcb6ff711dec87aeb0b30ec8066c06c725321b1904b5ba01e4e2b",
+        "baseFee": "1000000000000000"
       }
     }
   }
