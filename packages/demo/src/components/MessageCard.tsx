@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { cn, fmtId, fmtEth, shortAddress, CHAIN_NAMES } from '@/lib/utils'
 
-export interface MockMessage {
+export interface Message {
   id:               bigint
   sender:           string
   destinationChain: number
@@ -43,7 +43,7 @@ const EXPLORER_ADDR: Record<number, string> = {
 }
 
 interface MessageCardProps {
-  message: MockMessage
+  message: Message
   index:   number
 }
 

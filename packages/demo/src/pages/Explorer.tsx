@@ -4,13 +4,13 @@ import { Search, Filter, Radio, Inbox } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
-import MessageCard, { type MockMessage } from '@/components/MessageCard'
+import MessageCard, { type Message } from '@/components/MessageCard'
 import { cn } from '@/lib/utils'
 import { useMessages } from '@/hooks/useMessages'
 
 // ── Chart helpers ─────────────────────────────────────────────────────────────
 
-function buildChartData(msgs: MockMessage[]) {
+function buildChartData(msgs: Message[]) {
   const DAY_S = 86_400
   const days  = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const today = Math.floor(Date.now() / 1000 / DAY_S)

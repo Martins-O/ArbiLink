@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { JsonRpcProvider, Contract } from 'ethers'
-import type { MockMessage } from '@/components/MessageCard'
+import type { Message } from '@/components/MessageCard'
 import MessageHubABI from '../../../sdk/src/abi/MessageHub.json'
 import { MESSAGE_HUB_ADDRESS } from '@arbilink/sdk'
 
@@ -18,7 +18,7 @@ function deriveStatus(
   confirmTimestamps: Map<string, number>,
   challengePeriod: number,
   now: number,
-): MockMessage['status'] {
+): Message['status'] {
   if (failedIds.has(idStr)) return 'failed'
   if (confirmedIds.has(idStr)) {
     const ts = confirmTimestamps.get(idStr) ?? 0
@@ -27,8 +27,8 @@ function deriveStatus(
   return 'pending'
 }
 
-export function useMessages(mockMessages: MockMessage[]) {
-  const [messages, setMessages] = useState<MockMessage[]>(mockMessages)
+export function useMessages(mockMessages: Message[]) {
+  const [messages, setMessages] = useState<Message[]>(mockMessages)
   const [loading,  setLoading]  = useState(false)
   const [isLive,   setIsLive]   = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -70,7 +70,7 @@ export function useMessages(mockMessages: MockMessage[]) {
 
         const now = Math.floor(Date.now() / 1000)
 
-        const msgs: MockMessage[] = sentEvents
+        const msgs: Message[] = sentEvents
           .map((e: any) => ({
             id:               e.args.messageId  as bigint,
             sender:           e.args.sender     as string,
