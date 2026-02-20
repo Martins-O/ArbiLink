@@ -4,7 +4,6 @@ import type { MockMessage } from '@/components/MessageCard'
 import MessageHubABI from '../../../sdk/src/abi/MessageHub.json'
 import { MESSAGE_HUB_ADDRESS, ARBITRUM_SEPOLIA_RPC } from '@arbilink/sdk'
 
-const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000'
 const LOOK_BACK_BLOCKS = 50_000
 const POLL_MS = 30_000
 
@@ -31,8 +30,6 @@ export function useMessages(mockMessages: MockMessage[]) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    if (MESSAGE_HUB_ADDRESS === ZERO_ADDRESS) return  // not deployed yet
-
     setIsLive(true)
 
     const provider = new JsonRpcProvider(ARBITRUM_SEPOLIA_RPC)
@@ -42,22 +39,20 @@ export function useMessages(mockMessages: MockMessage[]) {
       try {
         setLoading(true)
 
-        const [currentBlock, challengePeriod] = await Promise.all([
-          provider.getBlockNumber(),
-          hub.challenge_period() as Promise<bigint>,
-        ])
+        const currentBlock = await provider.getBlockNumber()
+        // challenge_period has no on-chain getter; use the deployment value
+        const cp = 300 // 5 minutes, matches initialize() call
 
         const fromBlock = Math.max(0, currentBlock - LOOK_BACK_BLOCKS)
 
-        const [sentEvents, confirmedEvents, challengedEvents] = await Promise.all([
-          hub.queryFilter(hub.filters.MessageSent(),     fromBlock),
+        const [sentEvents, confirmedEvents] = await Promise.all([
+          hub.queryFilter(hub.filters.MessageSent(),      fromBlock),
           hub.queryFilter(hub.filters.MessageConfirmed(), fromBlock),
-          hub.queryFilter(hub.filters.MessageChallenged(), fromBlock),
         ])
 
         // Overlay maps
         const confirmedIds      = new Set(confirmedEvents.map((e: any) => e.args.messageId.toString()))
-        const failedIds         = new Set(challengedEvents.map((e: any) => e.args.messageId.toString()))
+        const failedIds         = new Set<string>() // no challenge mechanism on-chain yet
         const confirmTimestamps = new Map<string, number>(
           confirmedEvents.map((e: any) => [e.args.messageId.toString(), Number(e.args.timestamp)])
         )
@@ -70,7 +65,6 @@ export function useMessages(mockMessages: MockMessage[]) {
         )
 
         const now = Math.floor(Date.now() / 1000)
-        const cp  = Number(challengePeriod)
 
         const msgs: MockMessage[] = sentEvents
           .map((e: any) => ({
@@ -80,7 +74,7 @@ export function useMessages(mockMessages: MockMessage[]) {
             target:           e.args.target     as string,
             status:           deriveStatus(
               e.args.messageId.toString(),
-              confirmedIds, failedIds, confirmTimestamps, cp, now,
+              confirmedIds, failedIds, confirmTimestamps, cp, now, // cp is the hardcoded 300s above
             ),
             feePaid:   e.args.fee as bigint,
             timestamp: blockTs.get(e.blockNumber) ?? 0,

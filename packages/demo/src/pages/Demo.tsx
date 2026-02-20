@@ -25,9 +25,9 @@ export function Demo() {
 
   const chainIdFor: Record<ChainName, string> = {
     ethereum: '11155111',
-    base: '84532',
-    polygon: '80001',
-    optimism: '420',
+    base:     '84532',
+    polygon:  '80002',
+    optimism: '11155420',
   };
 
   return (

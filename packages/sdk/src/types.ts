@@ -21,17 +21,17 @@ export type MessageStatus = 'pending' | 'relayed' | 'confirmed' | 'failed';
 /** Full message record as returned by the SDK */
 export interface Message {
   id: bigint;
-  sender: string;
-  destinationChain: number;
+  status: MessageStatus;
+  /** Sender address — populated from MessageSent event logs */
+  sender?: string;
+  /** Destination chain ID — populated from MessageSent event logs */
+  destinationChain?: number;
   /** Target contract on the destination chain */
   target?: string;
   /** Encoded calldata for the target */
   data?: string;
-  /** Unix timestamp of when the message was submitted */
-  timestamp?: number;
-  /** Protocol fee paid (in wei) */
-  feePaid: bigint;
-  status: MessageStatus;
+  /** Protocol fee paid (in wei) — populated from MessageSent event logs */
+  feePaid?: bigint;
   /** Relayer address, present once a relayer confirms delivery */
   relayer?: string;
 }

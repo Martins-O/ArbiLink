@@ -5,7 +5,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use stylus_sdk::{
-    alloy_primitives::{Address, U256, U8, U32},
+    alloy_primitives::{Address, Bytes, U256, U8, U32},
     alloy_sol_types::{sol, SolError},
     call::transfer::transfer_eth,
     prelude::*,
@@ -90,7 +90,7 @@ impl MessageHub {
     }
 
     #[payable]
-    pub fn send_message(&mut self, destination_chain: u32, target: Address, data: Vec<u8>) -> Result<U256, Vec<u8>> {
+    pub fn send_message(&mut self, destination_chain: u32, target: Address, data: Bytes) -> Result<U256, Vec<u8>> {
         let ck = U32::from(destination_chain);
         if !self.supported_chains.getter(ck).enabled.get() {
             return Err(enc(ChainNotSupported { chainId: destination_chain }));
@@ -113,11 +113,11 @@ impl MessageHub {
             m.relayer.set(Address::ZERO);
         }
         self.protocol_fee_balance.set(self.protocol_fee_balance.get() + val);
-        self.vm().log(MessageSent { messageId: id, sender, destinationChain: destination_chain, target, data: data.into(), fee: val });
+        self.vm().log(MessageSent { messageId: id, sender, destinationChain: destination_chain, target, data, fee: val });
         Ok(id)
     }
 
-    pub fn confirm_delivery(&mut self, message_id: U256, _proof: Vec<u8>) -> Result<(), Vec<u8>> {
+    pub fn confirm_delivery(&mut self, message_id: U256, _proof: Bytes) -> Result<(), Vec<u8>> {
         let relayer = self.vm().msg_sender();
         if !self.relayers.getter(relayer).active.get() { return Err(enc(RelayerNotActive { relayer })); }
         let ts = self.messages.getter(message_id).timestamp.get();

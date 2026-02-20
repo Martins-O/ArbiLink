@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { motion }               from 'framer-motion'
+import { JsonRpcProvider, Contract } from 'ethers'
 import { Zap, Globe, Clock, TrendingDown } from 'lucide-react'
+import MessageHubABI from '../../../sdk/src/abi/MessageHub.json'
+import { MESSAGE_HUB_ADDRESS, ARBITRUM_SEPOLIA_RPC } from '@arbilink/sdk'
 
 interface Stat {
   label:  string
@@ -12,25 +15,36 @@ interface Stat {
 }
 
 const BASE_STATS: Stat[] = [
-  { label: 'Messages Relayed', value: '1,284',  suffix: '',   icon: Zap,          color: 'text-blue-400',    bg: 'bg-blue-500/10   border-blue-500/20'   },
-  { label: 'Chains Supported', value: '4',      suffix: '',   icon: Globe,        color: 'text-violet-400',  bg: 'bg-violet-500/10 border-violet-500/20' },
-  { label: 'Avg Delivery',     value: '~12',    suffix: 's',  icon: Clock,        color: 'text-cyan-400',    bg: 'bg-cyan-500/10   border-cyan-500/20'   },
-  { label: 'Cost vs Bridges',  value: '-95',    suffix: '%',  icon: TrendingDown, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+  { label: 'Messages Relayed', value: '…',   suffix: '',   icon: Zap,          color: 'text-blue-400',    bg: 'bg-blue-500/10   border-blue-500/20'   },
+  { label: 'Chains Supported', value: '3',   suffix: '',   icon: Globe,        color: 'text-violet-400',  bg: 'bg-violet-500/10 border-violet-500/20' },
+  { label: 'Avg Delivery',     value: '~12', suffix: 's',  icon: Clock,        color: 'text-cyan-400',    bg: 'bg-cyan-500/10   border-cyan-500/20'   },
+  { label: 'Cost vs Bridges',  value: '-95', suffix: '%',  icon: TrendingDown, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
 ]
 
 export default function StatsCards() {
-  const [count, setCount] = useState(1284)
+  const [messageCount, setMessageCount] = useState<string>('…')
 
-  // Simulate live counter ticking up
   useEffect(() => {
-    const t = setInterval(() => {
-      setCount(c => c + Math.floor(Math.random() * 2))
-    }, 4000)
+    const provider = new JsonRpcProvider(ARBITRUM_SEPOLIA_RPC)
+    const hub      = new Contract(MESSAGE_HUB_ADDRESS, MessageHubABI, provider)
+
+    async function fetchCount() {
+      try {
+        const count = await hub.messageCount() as bigint
+        setMessageCount(Number(count).toLocaleString())
+      } catch {
+        setMessageCount('—')
+      }
+    }
+
+    fetchCount()
+    // Refresh every 30s to stay in sync with the Explorer
+    const t = setInterval(fetchCount, 30_000)
     return () => clearInterval(t)
   }, [])
 
   const stats = BASE_STATS.map((s, i) =>
-    i === 0 ? { ...s, value: count.toLocaleString() } : s,
+    i === 0 ? { ...s, value: messageCount } : s,
   )
 
   return (

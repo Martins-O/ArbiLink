@@ -25,6 +25,19 @@ ArbiLink is a trustless, optimistic cross-chain messaging protocol built on **Ar
 
 ---
 
+## Live Testnet Deployment
+
+| Contract | Chain | Address |
+|----------|-------|---------|
+| MessageHub | Arbitrum Sepolia | [`0x9a9e7Ec4EA29bb63fE7c38E124B253b44fF897Cc`](https://sepolia.arbiscan.io/address/0x9a9e7Ec4EA29bb63fE7c38E124B253b44fF897Cc) |
+| ArbiLinkReceiver | Base Sepolia | [`0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35`](https://sepolia.basescan.org/address/0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35) |
+| ArbiLinkReceiver | Ethereum Sepolia | [`0x895058E57bBE8c84C2AABA5d61c4C739C5869F71`](https://sepolia.etherscan.io/address/0x895058E57bBE8c84C2AABA5d61c4C739C5869F71) |
+| ArbiLinkReceiver | Polygon Amoy | [`0x221B7Cca1C385C6c81e17b086C753328AF41AAAa`](https://amoy.polygonscan.com/address/0x221B7Cca1C385C6c81e17b086C753328AF41AAAa) |
+
+> Messages delivered on testnet: 3+ (Base Sepolia ×2, Ethereum Sepolia ×1)
+
+---
+
 ## Overview
 
 ArbiLink solves a simple but critical problem: **smart contracts on different chains cannot talk to each other natively**. ArbiLink provides the plumbing:
@@ -171,15 +184,15 @@ The hub is the heart of the protocol, deployed on **Arbitrum Sepolia** as a WASM
 
 | Function | Description |
 |----------|-------------|
-| `send_message(chain, target, data)` | Send a cross-chain message (payable) |
-| `confirm_delivery(id, proof)` | Relayer confirms execution with proof |
-| `challenge_message(id, proof)` | Challenge a fraudulent delivery |
-| `finalize_message(id)` | Finalize after challenge window |
-| `register_relayer()` | Stake ETH to become a relayer (payable) |
-| `exit_relayer()` | Withdraw stake and deregister |
-| `add_chain(chainId, receiver, fee)` | Owner: register a destination chain |
-| `calculate_fee(chainId)` | View: get base fee for a destination |
-| `get_message_status(id)` | View: 0=Pending 1=Relayed 2=Confirmed 3=Failed |
+| `sendMessage(chain, target, data)` | Send a cross-chain message (payable) |
+| `confirmDelivery(id, proof)` | Relayer confirms execution with proof |
+| `challengeMessage(id, proof)` | Challenge a fraudulent delivery |
+| `finalizeMessage(id)` | Finalize after challenge window |
+| `registerRelayer()` | Stake ETH to become a relayer (payable) |
+| `exitRelayer()` | Withdraw stake and deregister |
+| `addChain(chainId, receiver, fee)` | Owner: register a destination chain |
+| `calculateFee(chainId)` | View: get base fee for a destination |
+| `getMessageStatus(id)` | View: 0=Pending 1=Relayed 2=Confirmed 3=Failed |
 
 ---
 
@@ -435,6 +448,7 @@ PENDING ──► RELAYED ──► CONFIRMED
 | Arbitrum Sepolia | 421614 | Hub (source) |
 | Ethereum Sepolia | 11155111 | Destination |
 | Base Sepolia | 84532 | Destination |
+| Polygon Amoy | 80002 | Destination |
 
 ---
 

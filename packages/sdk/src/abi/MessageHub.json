@@ -11,7 +11,7 @@
   },
   {
     "type": "function",
-    "name": "send_message",
+    "name": "sendMessage",
     "inputs": [
       { "name": "destination_chain", "type": "uint32"  },
       { "name": "target",            "type": "address" },
@@ -22,136 +22,63 @@
   },
   {
     "type": "function",
-    "name": "confirm_delivery",
+    "name": "confirmDelivery",
     "inputs": [
-      { "name": "message_id",      "type": "uint256" },
-      { "name": "execution_proof", "type": "bytes"   }
+      { "name": "message_id", "type": "uint256" },
+      { "name": "_proof",     "type": "bytes"   }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "challenge_message",
-    "inputs": [
-      { "name": "message_id",    "type": "uint256" },
-      { "name": "proof_of_fraud","type": "bytes"   }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "finalize_message",
-    "inputs": [{ "name": "message_id", "type": "uint256" }],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "register_relayer",
+    "name": "registerRelayer",
     "inputs": [],
     "outputs": [],
     "stateMutability": "payable"
   },
   {
     "type": "function",
-    "name": "exit_relayer",
+    "name": "exitRelayer",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "add_chain",
+    "name": "addChain",
     "inputs": [
-      { "name": "chain_id",          "type": "uint32"  },
-      { "name": "receiver_address",  "type": "address" },
-      { "name": "base_fee",          "type": "uint256" }
+      { "name": "chain_id",         "type": "uint32"  },
+      { "name": "receiver_address", "type": "address" },
+      { "name": "base_fee",         "type": "uint256" }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
-    "name": "disable_chain",
-    "inputs": [{ "name": "chain_id", "type": "uint32" }],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "withdraw_fees",
-    "inputs": [{ "name": "amount", "type": "uint256" }],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "transfer_ownership",
-    "inputs": [{ "name": "new_owner", "type": "address" }],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "get_message_status",
+    "name": "getMessageStatus",
     "inputs": [{ "name": "message_id", "type": "uint256" }],
     "outputs": [{ "name": "", "type": "uint8" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "get_message_sender",
-    "inputs": [{ "name": "message_id", "type": "uint256" }],
-    "outputs": [{ "name": "", "type": "address" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "get_message_relayer",
-    "inputs": [{ "name": "message_id", "type": "uint256" }],
-    "outputs": [{ "name": "", "type": "address" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "get_message_fee",
-    "inputs": [{ "name": "message_id", "type": "uint256" }],
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "get_message_destination",
-    "inputs": [{ "name": "message_id", "type": "uint256" }],
-    "outputs": [{ "name": "", "type": "uint32" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "calculate_fee",
+    "name": "calculateFee",
     "inputs": [{ "name": "destination_chain", "type": "uint32" }],
     "outputs": [{ "name": "", "type": "uint256" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "is_active_relayer",
+    "name": "isActiveRelayer",
     "inputs": [{ "name": "relayer", "type": "address" }],
     "outputs": [{ "name": "", "type": "bool" }],
     "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "relayer_stake",
-    "inputs": [{ "name": "relayer", "type": "address" }],
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "message_count",
+    "name": "messageCount",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint256" }],
     "stateMutability": "view"
@@ -165,40 +92,8 @@
   },
   {
     "type": "function",
-    "name": "min_stake",
+    "name": "minStake",
     "inputs": [],
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "challenge_period",
-    "inputs": [],
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "protocol_fee_balance",
-    "inputs": [],
-    "outputs": [{ "name": "", "type": "uint256" }],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "chain_info",
-    "inputs": [{ "name": "chain_id", "type": "uint32" }],
-    "outputs": [
-      { "name": "enabled",          "type": "bool"    },
-      { "name": "receiver_address", "type": "address" },
-      { "name": "base_fee",         "type": "uint256" }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "challenge_deadline",
-    "inputs": [{ "name": "message_id", "type": "uint256" }],
     "outputs": [{ "name": "", "type": "uint256" }],
     "stateMutability": "view"
   },
@@ -225,15 +120,6 @@
   },
   {
     "type": "event",
-    "name": "MessageChallenged",
-    "inputs": [
-      { "name": "messageId",     "type": "uint256", "indexed": true  },
-      { "name": "challenger",    "type": "address", "indexed": true  },
-      { "name": "relayerSlashed","type": "bool",    "indexed": false }
-    ]
-  },
-  {
-    "type": "event",
     "name": "RelayerRegistered",
     "inputs": [
       { "name": "relayer", "type": "address", "indexed": true  },
@@ -252,30 +138,19 @@
     "type": "event",
     "name": "ChainAdded",
     "inputs": [
-      { "name": "chainId",   "type": "uint32",  "indexed": true  },
-      { "name": "receiver",  "type": "address", "indexed": false },
-      { "name": "baseFee",   "type": "uint256", "indexed": false }
+      { "name": "chainId",  "type": "uint32",  "indexed": true  },
+      { "name": "receiver", "type": "address", "indexed": false },
+      { "name": "baseFee",  "type": "uint256", "indexed": false }
     ]
   },
-  {
-    "type": "event",
-    "name": "FeesWithdrawn",
-    "inputs": [
-      { "name": "owner",  "type": "address", "indexed": true  },
-      { "name": "amount", "type": "uint256", "indexed": false }
-    ]
-  },
-  { "type": "error", "name": "ChainNotSupported",   "inputs": [{ "name": "chainId",   "type": "uint32"  }] },
-  { "type": "error", "name": "InsufficientFee",     "inputs": [{ "name": "required",  "type": "uint256" }, { "name": "provided", "type": "uint256" }] },
-  { "type": "error", "name": "MessageNotFound",     "inputs": [{ "name": "messageId", "type": "uint256" }] },
-  { "type": "error", "name": "ChallengeExpired",    "inputs": [{ "name": "deadline",  "type": "uint256" }] },
-  { "type": "error", "name": "ChallengeWindowOpen", "inputs": [{ "name": "deadline",  "type": "uint256" }] },
-  { "type": "error", "name": "InsufficientStake",   "inputs": [{ "name": "required",  "type": "uint256" }, { "name": "provided", "type": "uint256" }] },
-  { "type": "error", "name": "Unauthorized",        "inputs": [{ "name": "caller",    "type": "address" }] },
-  { "type": "error", "name": "InvalidProof",        "inputs": [] },
-  { "type": "error", "name": "RelayerNotActive",    "inputs": [{ "name": "relayer",   "type": "address" }] },
-  { "type": "error", "name": "WrongStatus",         "inputs": [{ "name": "expected",  "type": "uint8"   }, { "name": "actual", "type": "uint8" }] },
-  { "type": "error", "name": "TransferFailed",      "inputs": [] },
-  { "type": "error", "name": "ZeroAddress",         "inputs": [] },
-  { "type": "error", "name": "AlreadyInitialized",  "inputs": [] }
+  { "type": "error", "name": "ChainNotSupported",  "inputs": [{ "name": "chainId",   "type": "uint32"  }] },
+  { "type": "error", "name": "InsufficientFee",    "inputs": [{ "name": "required",  "type": "uint256" }, { "name": "provided", "type": "uint256" }] },
+  { "type": "error", "name": "MessageNotFound",    "inputs": [{ "name": "messageId", "type": "uint256" }] },
+  { "type": "error", "name": "InsufficientStake",  "inputs": [{ "name": "required",  "type": "uint256" }, { "name": "provided", "type": "uint256" }] },
+  { "type": "error", "name": "Unauthorized",       "inputs": [{ "name": "caller",    "type": "address" }] },
+  { "type": "error", "name": "RelayerNotActive",   "inputs": [{ "name": "relayer",   "type": "address" }] },
+  { "type": "error", "name": "AlreadyRelayed",     "inputs": [{ "name": "messageId", "type": "uint256" }] },
+  { "type": "error", "name": "TransferFailed",     "inputs": [] },
+  { "type": "error", "name": "ZeroAddress",        "inputs": [] },
+  { "type": "error", "name": "AlreadyInitialized", "inputs": [] }
 ]

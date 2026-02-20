@@ -1,27 +1,12 @@
 import { useState }     from 'react'
 import { motion }        from 'framer-motion'
-import { Search, Filter, Radio } from 'lucide-react'
+import { Search, Filter, Radio, Inbox } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import MessageCard, { type MockMessage } from '@/components/MessageCard'
 import { cn } from '@/lib/utils'
 import { useMessages } from '@/hooks/useMessages'
-
-// ── Fallback mock data ────────────────────────────────────────────────────────
-
-const now = Math.floor(Date.now() / 1000)
-
-const MOCK_MESSAGES: MockMessage[] = [
-  { id: 1284n, sender: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266', destinationChain: 11155111, target: '0x742d35Cc6634C0532925a3b844BC454e4438f44e', status: 'confirmed', feePaid: 1_000_000_000_000_000n, timestamp: now - 45,   demo: 'NFT Mint'        },
-  { id: 1283n, sender: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', destinationChain: 84532,    target: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', status: 'relayed',   feePaid: 800_000_000_000_000n,  timestamp: now - 120,  demo: 'Token Transfer'  },
-  { id: 1282n, sender: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC', destinationChain: 11155111, target: '0x408ED6354d4973f66138C91495F2f2FCbd8724C3', status: 'confirmed', feePaid: 1_200_000_000_000_000n, timestamp: now - 360,  demo: 'DAO Vote'        },
-  { id: 1281n, sender: '0x90F79bf6EB2c4f870365E785982E1f101E93b906', destinationChain: 84532,    target: '0x742d35Cc6634C0532925a3b844BC454e4438f44e', status: 'confirmed', feePaid: 950_000_000_000_000n,  timestamp: now - 720,  demo: 'NFT Mint'        },
-  { id: 1280n, sender: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65', destinationChain: 11155111, target: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', status: 'failed',    feePaid: 800_000_000_000_000n,  timestamp: now - 1440, demo: 'Token Transfer'  },
-  { id: 1279n, sender: '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc', destinationChain: 84532,    target: '0x408ED6354d4973f66138C91495F2f2FCbd8724C3', status: 'confirmed', feePaid: 1_100_000_000_000_000n, timestamp: now - 2880, demo: 'DAO Vote'        },
-  { id: 1278n, sender: '0x976EA74026E726554dB657fA54763abd0C3a0aa9', destinationChain: 11155111, target: '0x742d35Cc6634C0532925a3b844BC454e4438f44e', status: 'confirmed', feePaid: 900_000_000_000_000n,  timestamp: now - 4320, demo: 'NFT Mint'        },
-  { id: 1277n, sender: '0x14dC79964da2C08b23698B3D3cc7Ca32193d9955', destinationChain: 84532,    target: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', status: 'pending',   feePaid: 800_000_000_000_000n,  timestamp: now - 30,   demo: 'Token Transfer'  },
-]
 
 // ── Chart helpers ─────────────────────────────────────────────────────────────
 
@@ -42,16 +27,6 @@ function buildChartData(msgs: MockMessage[]) {
   return result
 }
 
-const MOCK_CHART = [
-  { day: 'Mon', count: 142 },
-  { day: 'Tue', count: 198 },
-  { day: 'Wed', count: 167 },
-  { day: 'Thu', count: 254 },
-  { day: 'Fri', count: 312 },
-  { day: 'Sat', count: 287 },
-  { day: 'Sun', count: 224 },
-]
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 const STATUS_FILTERS = ['all', 'pending', 'relayed', 'confirmed', 'failed'] as const
@@ -63,14 +38,14 @@ export default function Explorer() {
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
 
-  const { messages, loading, isLive } = useMessages(MOCK_MESSAGES)
-  const chartData = isLive ? buildChartData(messages) : MOCK_CHART
+  const { messages, loading, isLive } = useMessages([])
+  const chartData = buildChartData(messages)
 
   const filtered = messages.filter(m => {
     const matchFilter = filter === 'all' || m.status === filter
     const matchSearch = search === '' ||
       m.id.toString().includes(search) ||
-      m.sender.toLowerCase().includes(search.toLowerCase()) ||
+      (m.sender ?? '').toLowerCase().includes(search.toLowerCase()) ||
       m.demo.toLowerCase().includes(search.toLowerCase())
     return matchFilter && matchSearch
   })
@@ -98,7 +73,7 @@ export default function Explorer() {
               : 'text-slate-500 border-slate-700 bg-slate-800/50',
           )}>
             <Radio className={cn('w-3 h-3', isLive && 'animate-pulse')} />
-            {loading ? 'Loading…' : isLive ? 'Live' : 'Demo data'}
+            {loading ? 'Loading…' : isLive ? 'Live' : 'Connecting…'}
           </div>
         </motion.div>
 
@@ -183,10 +158,15 @@ export default function Explorer() {
 
         {/* Message list */}
         <div className="space-y-3">
-          {filtered.length === 0 ? (
+          {loading && messages.length === 0 ? (
             <div className="text-center py-16 text-slate-600">
-              <Search className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              No messages match your search
+              <Radio className="w-10 h-10 mx-auto mb-3 opacity-40 animate-pulse" />
+              <p>Fetching messages from Arbitrum Sepolia…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-16 text-slate-600">
+              <Inbox className="w-10 h-10 mx-auto mb-3 opacity-40" />
+              <p>{search || filter !== 'all' ? 'No messages match your search' : 'No messages yet — be the first to send one!'}</p>
             </div>
           ) : (
             filtered.map((msg, i) => (
@@ -196,9 +176,7 @@ export default function Explorer() {
         </div>
 
         <p className="text-center text-xs text-slate-700 mt-8">
-          {isLive
-            ? 'Live data from Arbitrum Sepolia · refreshes every 30s'
-            : 'Showing demo data — deploy contracts to see live messages'}
+          Live data from Arbitrum Sepolia · refreshes every 30s
         </p>
       </div>
     </div>

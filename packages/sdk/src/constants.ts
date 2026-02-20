@@ -3,7 +3,7 @@ import type { ChainConfig, ChainName } from './types';
 // ── Contract addresses ────────────────────────────────────────────────────────
 
 /** MessageHub deployed on Arbitrum Sepolia (421614) */
-export const MESSAGE_HUB_ADDRESS = '0x9c51691bD700B81d2dc50e9A7b5011c4acD8CD5f';
+export const MESSAGE_HUB_ADDRESS = '0x9a9e7Ec4EA29bb63fE7c38E124B253b44fF897Cc';
 
 /** ArbiLinkReceiver addresses on each destination chain */
 export const RECEIVER_ADDRESSES: Record<number, string> = {

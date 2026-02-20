@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import MessageHubABI from './abi/MessageHub.json';
 import { MESSAGE_HUB_ADDRESS } from './constants';
-import { ArbiLinkError, type Message, type MessageStatus, type RelayerInfo, type SendMessageParams, type WatchOptions } from './types';
+import { ArbiLinkError, type Message, type MessageStatus, type SendMessageParams, type WatchOptions } from './types';
 import { parseStatusCode, resolveChainId } from './utils';
 
 // ── ArbiLink SDK ──────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ export class ArbiLink {
 
     let tx: ethers.TransactionResponse;
     try {
-      tx = await this.messageHub.send_message(
+      tx = await this.messageHub.sendMessage(
         chainId,
         params.target,
         params.data,
@@ -114,38 +114,59 @@ export class ArbiLink {
   /**
    * Query the current status and metadata of a message.
    *
-   * Performs parallel RPC calls for all available fields.
-   * `target` and `data` are not stored as individual getters on the hub; query
-   * the `MessageSent` event if you need them.
+   * Fetches the status code from the hub and enriches it with data from
+   * `MessageSent` and `MessageConfirmed` event logs.
    *
    * @example
    * ```typescript
    * const msg = await arbiLink.getMessageStatus(messageId);
-   * console.log(msg.status);          // 'pending' | 'relayed' | 'confirmed' | 'failed'
+   * console.log(msg.status);           // 'pending' | 'confirmed'
    * console.log(msg.destinationChain); // 11155111
    * ```
    */
   async getMessageStatus(messageId: bigint): Promise<Message> {
     try {
-      const [statusCode, sender, relayer, destination, fee] = await Promise.all([
-        this.messageHub.get_message_status(messageId)     as Promise<bigint>,
-        this.messageHub.get_message_sender(messageId)     as Promise<string>,
-        this.messageHub.get_message_relayer(messageId)    as Promise<string>,
-        this.messageHub.get_message_destination(messageId) as Promise<bigint>,
-        this.messageHub.get_message_fee(messageId)        as Promise<bigint>,
-      ]);
-
+      const statusCode = await this.messageHub.getMessageStatus(messageId) as bigint;
       const status: MessageStatus = parseStatusCode(Number(statusCode));
 
+      // Enrich from MessageSent event
+      const sentFilter = this.messageHub.filters['MessageSent'](messageId);
+      const sentLogs   = await this.messageHub.queryFilter(sentFilter);
+
+      let sender: string | undefined;
+      let destinationChain: number | undefined;
+      let target: string | undefined;
+      let data: string | undefined;
+      let feePaid: bigint | undefined;
+
+      if (sentLogs.length > 0) {
+        const e = sentLogs[0] as ethers.EventLog;
+        sender           = e.args.sender           as string;
+        destinationChain = Number(e.args.destinationChain);
+        target           = e.args.target           as string;
+        data             = e.args.data             as string;
+        feePaid          = e.args.fee              as bigint;
+      }
+
+      // Enrich from MessageConfirmed event (present only when confirmed)
+      let relayer: string | undefined;
+      if (status === 'confirmed' || status === 'relayed') {
+        const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
+        const confirmedLogs   = await this.messageHub.queryFilter(confirmedFilter);
+        if (confirmedLogs.length > 0) {
+          relayer = (confirmedLogs[0] as ethers.EventLog).args.relayer as string;
+        }
+      }
+
       return {
-        id:               messageId,
+        id: messageId,
         status,
-        sender:           sender as string,
-        destinationChain: Number(destination),
-        feePaid:          fee as bigint,
-        relayer:          (relayer as string) !== ethers.ZeroAddress
-                            ? (relayer as string)
-                            : undefined,
+        sender,
+        destinationChain,
+        target,
+        data,
+        feePaid,
+        relayer,
       };
     } catch (err) {
       throw ArbiLinkError.from(err, `Failed to fetch status for message #${messageId}`);
@@ -165,7 +186,7 @@ export class ArbiLink {
    */
   async calculateFee(chainId: number): Promise<bigint> {
     try {
-      return await this.messageHub.calculate_fee(chainId) as bigint;
+      return await this.messageHub.calculateFee(chainId) as bigint;
     } catch (err) {
       throw ArbiLinkError.from(err, `Failed to fetch fee for chain ${chainId}`);
     }
@@ -174,20 +195,16 @@ export class ArbiLink {
   // ── Core: watch ────────────────────────────────────────────────────────────
 
   /**
-   * Subscribe to status changes for a given message.
+   * Subscribe to confirmation events for a given message.
    *
-   * The callback fires when either a `MessageConfirmed` (success) or
-   * `MessageChallenged` (failure) event is emitted for this message ID.
-   *
-   * @returns An unsubscribe function — call it when you're done watching.
+   * The callback fires when a `MessageConfirmed` event is emitted for this
+   * message ID. Call the returned function to unsubscribe.
    *
    * @example
    * ```typescript
    * const unwatch = arbiLink.watchMessage(messageId, (msg) => {
    *   console.log('Update:', msg.status);
-   *   if (msg.status === 'confirmed' || msg.status === 'failed') {
-   *     unwatch();
-   *   }
+   *   if (msg.status === 'confirmed') unwatch();
    * });
    * ```
    */
@@ -196,8 +213,7 @@ export class ArbiLink {
     callback: (message: Message) => void,
     _options: WatchOptions = {},
   ): () => void {
-    const confirmedFilter  = this.messageHub.filters['MessageConfirmed'](messageId);
-    const challengedFilter = this.messageHub.filters['MessageChallenged'](messageId);
+    const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
 
     const listener = async (): Promise<void> => {
       try {
@@ -210,12 +226,10 @@ export class ArbiLink {
       }
     };
 
-    this.messageHub.on(confirmedFilter,  listener);
-    this.messageHub.on(challengedFilter, listener);
+    this.messageHub.on(confirmedFilter, listener);
 
     return () => {
-      this.messageHub.off(confirmedFilter,  listener);
-      this.messageHub.off(challengedFilter, listener);
+      this.messageHub.off(confirmedFilter, listener);
     };
   }
 
@@ -225,14 +239,7 @@ export class ArbiLink {
    * Check whether `address` is a registered, active relayer.
    */
   async isActiveRelayer(address: string): Promise<boolean> {
-    return await this.messageHub.is_active_relayer(address) as boolean;
-  }
-
-  /**
-   * Fetch the staked ETH (in wei) for a relayer.
-   */
-  async relayerStake(address: string): Promise<bigint> {
-    return await this.messageHub.relayer_stake(address) as bigint;
+    return await this.messageHub.isActiveRelayer(address) as boolean;
   }
 
   /**
@@ -244,9 +251,9 @@ export class ArbiLink {
   async registerRelayer(stakeOverride?: bigint): Promise<void> {
     this.requireSigner();
 
-    const stake = stakeOverride ?? await this.messageHub.min_stake() as bigint;
+    const stake = stakeOverride ?? await this.messageHub.minStake() as bigint;
 
-    const tx = await this.messageHub.register_relayer({ value: stake }) as ethers.TransactionResponse;
+    const tx = await this.messageHub.registerRelayer({ value: stake }) as ethers.TransactionResponse;
     await tx.wait();
   }
 
@@ -255,31 +262,31 @@ export class ArbiLink {
    */
   async exitRelayer(): Promise<void> {
     this.requireSigner();
-    const tx = await this.messageHub.exit_relayer() as ethers.TransactionResponse;
+    const tx = await this.messageHub.exitRelayer() as ethers.TransactionResponse;
     await tx.wait();
   }
 
-  // ── Chain info ─────────────────────────────────────────────────────────────
-
-  /**
-   * Fetch on-chain configuration for a destination chain.
-   *
-   * @returns `{ enabled, receiverAddress, baseFee }` or `null` if not registered.
-   */
-  async getChainInfo(chainId: number): Promise<{ enabled: boolean; receiverAddress: string; baseFee: bigint } | null> {
-    try {
-      const [enabled, receiverAddress, baseFee] = await this.messageHub.chain_info(chainId) as [boolean, string, bigint];
-      return { enabled, receiverAddress, baseFee };
-    } catch {
-      return null;
-    }
-  }
+  // ── Hub info ───────────────────────────────────────────────────────────────
 
   /**
    * Total number of messages sent through the hub.
    */
   async messageCount(): Promise<bigint> {
-    return await this.messageHub.message_count() as bigint;
+    return await this.messageHub.messageCount() as bigint;
+  }
+
+  /**
+   * The hub owner address.
+   */
+  async owner(): Promise<string> {
+    return await this.messageHub.owner() as string;
+  }
+
+  /**
+   * Minimum stake (wei) required to register as a relayer.
+   */
+  async minStake(): Promise<bigint> {
+    return await this.messageHub.minStake() as bigint;
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
