@@ -83,6 +83,7 @@ export function useMessages(mockMessages: MockMessage[]) {
             feePaid:   e.args.fee as bigint,
             timestamp: blockTs.get(e.blockNumber) ?? 0,
             demo:      'Cross-chain',
+            txHash:    e.transactionHash as string,
           }))
           .reverse()
 
