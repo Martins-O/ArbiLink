@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 const NAV_LINKS = [
   { to: '/',         label: 'Home',     internal: true },
@@ -22,34 +23,37 @@ export function Header() {
             <span className="text-xl font-bold text-white">ArbiLink</span>
           </Link>
 
-          {/* Nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map(({ to, label, internal }) =>
-              internal ? (
-                <Link
-                  key={to}
-                  to={to}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    pathname === to
-                      ? 'text-white bg-slate-800'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                  }`}
-                >
-                  {label}
-                </Link>
-              ) : (
-                <a
-                  key={to}
-                  href={to}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
-                >
-                  {label}
-                </a>
-              )
-            )}
-          </nav>
+          {/* Nav + Wallet */}
+          <div className="flex items-center gap-3">
+            <nav className="hidden md:flex items-center gap-1">
+              {NAV_LINKS.map(({ to, label, internal }) =>
+                internal ? (
+                  <Link
+                    key={to}
+                    to={to}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      pathname === to
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                ) : (
+                  <a
+                    key={to}
+                    href={to}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+                  >
+                    {label}
+                  </a>
+                )
+              )}
+            </nav>
+            <ConnectButton showBalance={false} chainStatus="icon" accountStatus="avatar" />
+          </div>
 
         </div>
       </div>

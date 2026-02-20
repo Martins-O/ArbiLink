@@ -1,34 +1,70 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Clock, Zap, TrendingDown, Loader2, RefreshCw } from 'lucide-react';
+import { Send, Clock, Zap, TrendingDown, Loader2, RefreshCw, Wallet, AlertCircle, ExternalLink } from 'lucide-react';
 import { MessageTracker, MessageTrackerEmpty } from '../components/MessageTracker';
 import { ChainSelector } from '../components/ChainSelector';
 import { ComparisonSection } from '../components/ComparisonSection';
-import { useSimulation } from '../hooks/useSimulation';
+import { useSendMessage } from '../hooks/useSendMessage';
+import { fmtId } from '../lib/utils';
 import { DEMOS, CHAINS } from '../lib/constants';
 import type { ChainName } from '../lib/types';
 
+// Map ChainName → destination chain ID registered in the hub
+const CHAIN_ID: Record<ChainName, number> = {
+  ethereum: 11155111,  // ETH Sepolia
+  base:     84532,     // Base Sepolia
+  polygon:  80002,     // Polygon Amoy
+  optimism: 0,         // Not supported — disabled below
+};
+
+const SUPPORTED: Partial<Record<ChainName, true>> = {
+  ethereum: true,
+  base:     true,
+  polygon:  true,
+};
+
 export function Demo() {
   const [selectedDemo, setSelectedDemo] = useState('nft');
-  const [destination, setDestination] = useState<ChainName>('ethereum');
+  const [destination,  setDestination]  = useState<ChainName>('base');
 
   const {
-    isSimulating,
-    messageId,
-    simulationSteps,
+    sendMessage,
+    isSending,
+    msgId,
+    currentStep,
+    txHash,
+    senderAddress,
+    error,
+    steps,
     progress,
-    startSimulation,
-    resetSimulation,
-  } = useSimulation();
+    reset,
+    isConnected,
+    isWrongChain,
+  } = useSendMessage();
 
-  const done = progress >= 100;
+  const done = currentStep >= 5;
 
-  const chainIdFor: Record<ChainName, string> = {
-    ethereum: '11155111',
-    base:     '84532',
-    polygon:  '80002',
-    optimism: '11155420',
-  };
+  // Human-readable message ID for the tracker
+  const displayId = msgId != null
+    ? fmtId(msgId)
+    : currentStep === 0
+      ? 'pending…'
+      : null;
+
+  function handleSend() {
+    if (!SUPPORTED[destination]) return;
+    sendMessage(CHAIN_ID[destination]);
+  }
+
+  // ── Send button label + action ────────────────────────────────────────────
+
+  function sendButtonContent() {
+    if (!isConnected) return <><Wallet className="w-5 h-5" /> Connect Wallet to Send</>;
+    if (isWrongChain) return <><Zap className="w-5 h-5" /> Switch to Arbitrum Sepolia</>;
+    if (isSending)    return <><Loader2 className="w-5 h-5 animate-spin" /> Sending Message…</>;
+    if (done)         return <><RefreshCw className="w-5 h-5" /> Send Another Message</>;
+    return <><Send className="w-5 h-5" /> Send Cross-Chain Message</>;
+  }
 
   return (
     <div className="min-h-screen gradient-bg py-12 px-6">
@@ -57,8 +93,8 @@ export function Demo() {
             transition={{ delay: 0.2 }}
             className="text-xl text-slate-300 max-w-2xl mx-auto"
           >
-            Send cross-chain messages from Arbitrum to any chain — watch the
-            full lifecycle in real time.
+            Send real cross-chain messages from Arbitrum — watch the full lifecycle
+            settle on-chain in real time.
           </motion.p>
         </div>
 
@@ -110,9 +146,13 @@ export function Demo() {
             >
               <h2 className="text-lg font-bold text-white mb-4">Destination Chain</h2>
               <ChainSelector
-                chains={CHAINS}
+                chains={CHAINS.map(c => ({
+                  ...c,
+                  // Mark unsupported chains visually
+                  name: SUPPORTED[c.id] ? c.name : `${c.name} (soon)`,
+                }))}
                 selected={destination}
-                onChange={setDestination}
+                onChange={(c) => { if (SUPPORTED[c]) setDestination(c); }}
               />
             </motion.div>
 
@@ -124,18 +164,39 @@ export function Demo() {
               className="space-y-3"
             >
               <button
-                onClick={done ? resetSimulation : startSimulation}
-                disabled={isSimulating}
-                className="w-full button-primary flex items-center justify-center gap-2 py-4 text-base"
+                onClick={done ? reset : handleSend}
+                disabled={isSending || (!done && !SUPPORTED[destination])}
+                className="w-full button-primary flex items-center justify-center gap-2 py-4 text-base disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isSimulating ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Sending Message…</>
-                ) : done ? (
-                  <><RefreshCw className="w-5 h-5" /> Send Another Message</>
-                ) : (
-                  <><Send className="w-5 h-5" /> Send Cross-Chain Message</>
-                )}
+                {sendButtonContent()}
               </button>
+
+              {/* Error */}
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex items-start gap-2 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-xs"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </motion.div>
+              )}
+
+              {/* Tx hash link */}
+              {txHash && (
+                <motion.a
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  href={`https://sepolia.arbiscan.io/tx/${txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  View tx on Arbiscan
+                </motion.a>
+              )}
 
               {/* SDK hint */}
               <div className="glass-panel px-4 py-3 text-xs font-mono text-slate-400 leading-loose">
@@ -148,7 +209,7 @@ export function Demo() {
                 <span className="pl-4">
                   <span className="text-cyan-400">chainId</span>
                   <span className="text-slate-300">: </span>
-                  <span className="text-amber-400">{chainIdFor[destination]}</span>
+                  <span className="text-amber-400">{CHAIN_ID[destination] || '…'}</span>
                   <span className="text-slate-300">,</span>
                 </span>
                 <br />
@@ -170,8 +231,8 @@ export function Demo() {
               className="grid grid-cols-3 gap-3"
             >
               {[
-                { icon: Clock,       color: 'blue',   label: 'Est. Time', value: '12s'   },
-                { icon: Zap,         color: 'green',  label: 'Cost',      value: '$0.23' },
+                { icon: Clock,        color: 'blue',   label: 'Est. Time', value: '~15s'  },
+                { icon: Zap,          color: 'green',  label: 'Cost',      value: '0.001 ETH' },
                 { icon: TrendingDown, color: 'purple', label: 'Savings',   value: '95%'  },
               ].map(({ icon: Icon, color, label, value }) => (
                 <div
@@ -182,7 +243,7 @@ export function Demo() {
                     <Icon className="w-3 h-3" />
                     {label}
                   </div>
-                  <div className="text-2xl font-bold text-white">{value}</div>
+                  <div className="text-lg font-bold text-white">{value}</div>
                 </div>
               ))}
             </motion.div>
@@ -197,12 +258,14 @@ export function Demo() {
               className="glass-panel p-6 h-full"
             >
               <h2 className="text-lg font-bold text-white mb-6">Message Lifecycle</h2>
-              {messageId ? (
+              {displayId ? (
                 <MessageTracker
-                  messageId={messageId}
-                  steps={simulationSteps}
+                  messageId={displayId}
+                  steps={steps}
                   progress={progress}
                   destination={destination}
+                  txHash={txHash}
+                  senderAddress={senderAddress}
                 />
               ) : (
                 <MessageTrackerEmpty />
