@@ -64,11 +64,32 @@ else
     warn "Could not locate Rust 1.88.0 toolchain via rustup – falling back to system cargo"
 fi
 
-# ── Step 1: Build Stylus WASM ─────────────────────────────────────────────────
+# ── Step 1: Build + optimise Stylus WASM ─────────────────────────────────────
 echo "📦  Building MessageHub WASM..."
+WASM_FILE="${ROOT}/message-hub/target/wasm32-unknown-unknown/release/deps/message_hub.wasm"
+
 pushd "${ROOT}/message-hub" > /dev/null
 cargo build --release --target wasm32-unknown-unknown 2>&1 | \
     grep -E "Compiling|Finished|error" || true
+
+# Apply wasm-opt to reduce compressed size below the EIP-170 24 576-byte limit.
+# Three optimisation passes (2×Oz + O3) are needed; without them the compressed
+# WASM is ~25.3 KB and deployment fails with "max code size exceeded".
+if command -v wasm-opt > /dev/null 2>&1; then
+    echo "   Running wasm-opt (3 passes)..."
+    TMP1=$(mktemp --suffix=.wasm)
+    TMP2=$(mktemp --suffix=.wasm)
+    TMP3=$(mktemp --suffix=.wasm)
+    wasm-opt -Oz --enable-bulk-memory "${WASM_FILE}" -o "${TMP1}"
+    wasm-opt -Oz --enable-bulk-memory "${TMP1}"      -o "${TMP2}"
+    wasm-opt -O3  --enable-bulk-memory "${TMP2}"      -o "${TMP3}"
+    cp "${TMP3}" "${WASM_FILE}"
+    rm -f "${TMP1}" "${TMP2}" "${TMP3}"
+    ok "wasm-opt applied ($(stat -c%s "${WASM_FILE}") bytes raw)"
+else
+    warn "wasm-opt not found — deploying unoptimised WASM (may fail with max code size exceeded)"
+    warn "Install with: cargo install wasm-opt"
+fi
 popd > /dev/null
 ok "WASM built"
 
@@ -116,20 +137,43 @@ forge build --quiet
 ok "Receiver built"
 popd > /dev/null
 
+# Helper: deploy a Solidity contract via cast send --create and return address.
+# Usage: deploy_receiver <rpc_url>
+deploy_receiver() {
+    local RPC_URL="$1"
+    pushd "${ROOT}/contracts/receiver" > /dev/null
+    local BYTECODE
+    BYTECODE=$(python3 -c "
+import json, sys
+d = json.load(open('out/ArbiLinkReceiver.sol/ArbiLinkReceiver.json'))
+print(d['bytecode']['object'])
+")
+    local CTOR_ARGS
+    CTOR_ARGS=$(cast abi-encode "constructor(address,address)" "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}")
+    local INIT_CODE="${BYTECODE}${CTOR_ARGS#0x}"
+    local BASEFEE
+    BASEFEE=$(cast base-fee --rpc-url="${RPC_URL}" 2>/dev/null || echo "1000000")
+    local GAS_PRICE=$(( BASEFEE * 3 + 1000000000 ))
+    local RESULT
+    RESULT=$(cast send \
+        --rpc-url="${RPC_URL}" \
+        --private-key="${PRIVATE_KEY}" \
+        --gas-price="${GAS_PRICE}" \
+        --create "${INIT_CODE}" 2>&1)
+    popd > /dev/null
+    echo "${RESULT}" | python3 -c "
+import sys, re
+d = sys.stdin.read()
+m = re.search(r'contractAddress\s+(0x[0-9a-fA-F]{40})', d)
+print(m.group(1) if m else '')
+"
+}
+
 # ── Step 5: Deploy Receiver to Ethereum Sepolia ───────────────────────────────
 echo ""
 echo "🚀  Deploying ArbiLinkReceiver to Ethereum Sepolia..."
-TMPFILE_ETH=$(mktemp)
-forge create \
-    --rpc-url="${ETH_SEPOLIA_RPC}" \
-    --private-key="${PRIVATE_KEY}" \
-    "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver" \
-    --constructor-args "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}" \
-    2>&1 | tee "${TMPFILE_ETH}"
-
-ETH_RECEIVER=$(grep "Deployed to:" "${TMPFILE_ETH}" | awk '{print $3}')
-rm -f "${TMPFILE_ETH}"
-[[ -z "${ETH_RECEIVER}" ]] && die "ETH Receiver deployment failed"
+ETH_RECEIVER=$(deploy_receiver "${ETH_SEPOLIA_RPC}")
+[[ -z "${ETH_RECEIVER}" ]] && die "ETH Receiver deployment failed — no contract address in output"
 ok "ETH Receiver deployed: ${ETH_RECEIVER}"
 
 # Register ETH Sepolia in MessageHub (chainId 11155111, base fee 0.001 ETH)
@@ -138,24 +182,15 @@ cast send \
     --rpc-url="${ARB_SEPOLIA_RPC}" \
     --private-key="${PRIVATE_KEY}" \
     "${MESSAGE_HUB}" \
-    "add_chain(uint32,address,uint256)" \
+    "addChain(uint32,address,uint256)" \
     11155111 "${ETH_RECEIVER}" 1000000000000000
 ok "Ethereum Sepolia registered"
 
 # ── Step 6: Deploy Receiver to Base Sepolia ───────────────────────────────────
 echo ""
 echo "🚀  Deploying ArbiLinkReceiver to Base Sepolia..."
-TMPFILE_BASE=$(mktemp)
-forge create \
-    --rpc-url="${BASE_SEPOLIA_RPC}" \
-    --private-key="${PRIVATE_KEY}" \
-    "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver" \
-    --constructor-args "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}" \
-    2>&1 | tee "${TMPFILE_BASE}"
-
-BASE_RECEIVER=$(grep "Deployed to:" "${TMPFILE_BASE}" | awk '{print $3}')
-rm -f "${TMPFILE_BASE}"
-[[ -z "${BASE_RECEIVER}" ]] && die "Base Receiver deployment failed"
+BASE_RECEIVER=$(deploy_receiver "${BASE_SEPOLIA_RPC}")
+[[ -z "${BASE_RECEIVER}" ]] && die "Base Receiver deployment failed — no contract address in output"
 ok "Base Receiver deployed: ${BASE_RECEIVER}"
 
 # Register Base Sepolia in MessageHub (chainId 84532, base fee 0.001 ETH)
@@ -164,7 +199,7 @@ cast send \
     --rpc-url="${ARB_SEPOLIA_RPC}" \
     --private-key="${PRIVATE_KEY}" \
     "${MESSAGE_HUB}" \
-    "add_chain(uint32,address,uint256)" \
+    "addChain(uint32,address,uint256)" \
     84532 "${BASE_RECEIVER}" 1000000000000000
 ok "Base Sepolia registered"
 
