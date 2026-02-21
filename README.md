@@ -379,16 +379,29 @@ The relayer bot watches `MessageSent` events on Arbitrum Sepolia, delivers messa
 PRIVATE_KEY=0x... INFURA_KEY=... node --experimental-strip-types packages/relayer/src/index.ts
 ```
 
-### Railway (Recommended)
+### Fly.io (Recommended)
 
-A `Dockerfile` and `railway.toml` are included at the repo root.
+A `Dockerfile` and `fly.toml` are included at the repo root.
 
-1. Create a new project on [railway.app](https://railway.app) → **Deploy from GitHub repo**
-2. Railway auto-detects the `Dockerfile`
-3. Add environment variables in the Railway dashboard:
+```bash
+# Install flyctl
+curl -L https://fly.io/install.sh | sh
 
-| Variable | Description |
-|----------|-------------|
+# Log in
+flyctl auth login
+
+# Create the app (first time only)
+flyctl launch --name arbilink-relayer --no-deploy
+
+# Set secrets
+flyctl secrets set PRIVATE_KEY=0x... INFURA_KEY=your_infura_key
+
+# Deploy
+flyctl deploy
+```
+
+| Secret | Description |
+|--------|-------------|
 | `PRIVATE_KEY` | Relayer wallet private key (must be registered on the hub) |
 | `INFURA_KEY` | Infura project ID (for Arbitrum Sepolia + Ethereum Sepolia RPC) |
 
