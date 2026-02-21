@@ -145,19 +145,38 @@ arbilink/
 │       └── foundry.toml
 │
 ├── packages/
-│   └── sdk/                      # TypeScript SDK (@arbilink/sdk)
-│       ├── src/
-│       │   ├── ArbiLink.ts       # Main SDK class
-│       │   ├── types.ts          # TypeScript types
-│       │   ├── constants.ts      # Chain configs & addresses
-│       │   ├── utils.ts          # Encoding & formatting helpers
-│       │   ├── index.ts          # Public exports
-│       │   └── abi/
-│       │       ├── MessageHub.json   # Hub ABI
-│       │       └── Receiver.json     # Receiver ABI
-│       ├── package.json
-│       └── tsconfig.json
+│   ├── sdk/                      # TypeScript SDK (@arbilink/sdk)
+│   │   ├── src/
+│   │   │   ├── ArbiLink.ts       # Main SDK class
+│   │   │   ├── types.ts          # TypeScript types
+│   │   │   ├── constants.ts      # Chain configs & addresses
+│   │   │   ├── utils.ts          # Encoding & formatting helpers
+│   │   │   ├── index.ts          # Public exports
+│   │   │   └── abi/
+│   │   │       ├── MessageHub.json   # Hub ABI
+│   │   │       └── Receiver.json     # Receiver ABI
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── relayer/                  # Off-chain relayer bot (TypeScript)
+│   │   ├── src/index.ts          # Event watcher + delivery loop
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── demo/                     # Live demo dApp (React + Vite)
+│   │   ├── src/
+│   │   │   ├── pages/            # Home, Explorer, Send
+│   │   │   ├── components/       # MessageCard, StatsCards, etc.
+│   │   │   └── hooks/            # useMessages, useSendMessage
+│   │   └── vercel.json           # Vercel deployment config
+│   │
+│   └── docs/                     # Documentation site (VitePress)
+│       ├── getting-started/
+│       ├── api/
+│       └── .vitepress/
 │
+├── Dockerfile                    # Relayer container (for Railway)
+├── railway.toml                  # Railway deployment config
 ├── scripts/
 │   ├── deploy.sh                 # Full multi-chain deployment
 │   └── verify.sh                 # Block explorer verification
@@ -250,7 +269,7 @@ npm install @arbilink/sdk ethers
 | [Rust](https://rustup.rs) | 1.88.0 (pinned) | Stylus contract compilation |
 | [cargo-stylus](https://github.com/OffchainLabs/cargo-stylus) | latest | Stylus deploy & verify |
 | [Foundry](https://getfoundry.sh) | latest | Solidity compile, test, deploy |
-| Node.js | ≥ 18 | SDK development |
+| Node.js | ≥ 22 | SDK, relayer, demo |
 | pnpm | latest | SDK package manager |
 | [cast](https://book.getfoundry.sh/cast/) | (part of Foundry) | Contract calls via CLI |
 
@@ -347,6 +366,33 @@ export const RECEIVER_ADDRESSES: Record<number, string> = {
 source .env
 bash scripts/verify.sh
 ```
+
+---
+
+## Running the Relayer
+
+The relayer bot watches `MessageSent` events on Arbitrum Sepolia, delivers messages to destination chains, and calls `confirmDelivery` on the hub. It must run continuously for messages to progress past `pending`.
+
+### Locally
+
+```bash
+PRIVATE_KEY=0x... INFURA_KEY=... node --experimental-strip-types packages/relayer/src/index.ts
+```
+
+### Railway (Recommended)
+
+A `Dockerfile` and `railway.toml` are included at the repo root.
+
+1. Create a new project on [railway.app](https://railway.app) → **Deploy from GitHub repo**
+2. Railway auto-detects the `Dockerfile`
+3. Add environment variables in the Railway dashboard:
+
+| Variable | Description |
+|----------|-------------|
+| `PRIVATE_KEY` | Relayer wallet private key (must be registered on the hub) |
+| `INFURA_KEY` | Infura project ID (for Arbitrum Sepolia + Ethereum Sepolia RPC) |
+
+The relayer registers itself on-chain automatically on first start if not already staked.
 
 ---
 
