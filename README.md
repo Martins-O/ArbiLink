@@ -379,31 +379,20 @@ The relayer bot watches `MessageSent` events on Arbitrum Sepolia, delivers messa
 PRIVATE_KEY=0x... INFURA_KEY=... node --experimental-strip-types packages/relayer/src/index.ts
 ```
 
-### Fly.io (Recommended)
+### Render (Recommended)
 
-A `Dockerfile` and `fly.toml` are included at the repo root.
+A `render.yaml` and `Dockerfile` are included at the repo root. No CLI needed.
 
-```bash
-# Install flyctl
-curl -L https://fly.io/install.sh | sh
+1. Go to [render.com](https://render.com) → **New → Blueprint**
+2. Connect your GitHub repo — Render picks up `render.yaml` automatically
+3. Add your environment variables when prompted:
 
-# Log in
-flyctl auth login
-
-# Create the app (first time only)
-flyctl launch --name arbilink-relayer --no-deploy
-
-# Set secrets
-flyctl secrets set PRIVATE_KEY=0x... INFURA_KEY=your_infura_key
-
-# Deploy
-flyctl deploy
-```
-
-| Secret | Description |
-|--------|-------------|
+| Variable | Description |
+|----------|-------------|
 | `PRIVATE_KEY` | Relayer wallet private key (must be registered on the hub) |
 | `INFURA_KEY` | Infura project ID (for Arbitrum Sepolia + Ethereum Sepolia RPC) |
+
+4. Click **Apply** — Render builds the Docker image and starts the worker
 
 The relayer registers itself on-chain automatically on first start if not already staked.
 
