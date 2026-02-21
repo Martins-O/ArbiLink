@@ -17,6 +17,7 @@ import { ethers } from 'ethers';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import path from 'path';
+import http from 'http';
 
 const require = createRequire(import.meta.url);
 
@@ -276,6 +277,17 @@ async function main(): Promise<void> {
       console.error(`  ✗  Unhandled error processing event:`, (err as Error).message);
     }
   });
+
+  // Health-check server for Render / other platforms that require an open port
+  const port = process.env.PORT ? parseInt(process.env.PORT) : null;
+  if (port) {
+    http.createServer((_, res) => {
+      res.writeHead(200);
+      res.end('ArbiLink relayer running\n');
+    }).listen(port, () => {
+      console.log(`🌐  Health-check server listening on port ${port}`);
+    });
+  }
 
   // Keep the process alive
   setInterval(() => {/* heartbeat */}, POLL_INTERVAL_MS);
