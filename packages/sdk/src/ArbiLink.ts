@@ -150,7 +150,7 @@ export class ArbiLink {
 
       // Enrich from MessageConfirmed event (present only when confirmed)
       let relayer: string | undefined;
-      if (status === 'confirmed' || status === 'relayed') {
+      if (status === 'confirmed') {
         const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
         const confirmedLogs   = await this.messageHub.queryFilter(confirmedFilter);
         if (confirmedLogs.length > 0) {

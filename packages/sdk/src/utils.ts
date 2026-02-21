@@ -90,7 +90,12 @@ export function estimateDeliveryTime(chainId: number): number {
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
-const STATUS_MAP: MessageStatus[] = ['pending', 'relayed', 'confirmed', 'failed'];
+// Contract STATUS_PENDING=0, STATUS_CONFIRMED=1.
+// 'relayed' and 'challenged' are reserved for the future challenge system.
+const STATUS_MAP: Record<number, MessageStatus> = {
+  0: 'pending',
+  1: 'confirmed',
+};
 
 /**
  * Convert the on-chain numeric status code to the SDK string representation.
