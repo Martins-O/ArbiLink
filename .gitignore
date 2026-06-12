@@ -23,3 +23,13 @@ packages/demo/.env
 
 # Root workspace node_modules (pnpm hoisted store)
 node_modules/
+
+# Relayer build output
+packages/relayer/dist/
+packages/relayer/node_modules/
+
+# Root-level Rust/Foundry artifacts (generated during dev)
+target/
+Cargo.lock
+out/
+cache/

@@ -36,6 +36,6 @@ All guides follow the same structure:
 ```typescript
 // Universal pattern
 const data = encodeFunctionData({ abi, functionName, args });
-const id   = await arbiLink.sendMessage({ chainId, target, data });
+const id   = await arbiLink.sendMessage({ to: chainId, target, data });
 arbiLink.watchMessage(id, (msg) => console.log(msg.status));
 ```

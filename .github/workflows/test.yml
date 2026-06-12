@@ -1,0 +1,66 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [indev, main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  message-hub:
+    name: MessageHub (Stylus / Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          targets: wasm32-unknown-unknown
+      - run: cargo test --lib
+        working-directory: message-hub
+
+  sdk:
+    name: SDK (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - run: pnpm install --no-frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @arbilink/sdk test
+
+  relayer:
+    name: Relayer (TypeScript)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - run: pnpm install --no-frozen-lockfile --ignore-scripts
+      - run: pnpm --filter @arbilink/relayer test
+
+  receiver:
+    name: Receiver (Foundry)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Install forge-std
+        run: |
+          mkdir -p lib
+          git clone --depth 1 https://github.com/foundry-rs/forge-std.git lib/forge-std
+        working-directory: contracts/receiver
+      - run: forge test
+        working-directory: contracts/receiver

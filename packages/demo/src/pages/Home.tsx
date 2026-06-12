@@ -48,7 +48,7 @@ const HOW_STEPS = [
 const FEATURES = [
   { icon: Code2,  title: 'One SDK Call',       desc: 'sendMessage() is all you need. No bridge config, no token wrapping, no chain-specific logic.' },
   { icon: Shield, title: 'Optimistic Security',desc: 'Relayers stake ETH. Fraudulent delivery gets slashed. You keep the incentives honest.' },
-  { icon: Globe,  title: 'Any EVM Chain',       desc: 'Register any EVM destination via add_chain(). Ethereum, Base, Polygon, Optimism — and more.' },
+  { icon: Globe,  title: 'Any EVM Chain',       desc: 'Register any EVM destination via addChain(). Ethereum, Base, Polygon Amoy — and more.' },
   { icon: Zap,    title: 'Arbitrum Stylus',     desc: 'The hub is built in Rust on Stylus — 10x cheaper execution than an equivalent Solidity contract.' },
   { icon: Lock,   title: 'Replay Protection',   desc: 'Every message hash is stored. Replay attacks always revert, protecting the destination contract.' },
   { icon: Layers, title: 'Execute Anything',    desc: 'Encode any function call. Mint NFTs, transfer tokens, cast votes — all cross-chain.' },

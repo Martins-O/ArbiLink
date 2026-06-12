@@ -1,0 +1,10 @@
+services:
+  - type: worker
+    name: arbilink-relayer
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: PRIVATE_KEY
+        sync: false
+      - key: INFURA_KEY
+        sync: false

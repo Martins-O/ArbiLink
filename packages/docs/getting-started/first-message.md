@@ -77,7 +77,7 @@ const data = encodeFunctionData({
 
 // Send cross-chain message
 const messageId = await arbiLink.sendMessage({
-  chainId: 11155111,               // Ethereum Sepolia
+  to: 11155111,                     // Ethereum Sepolia
   target:  SIMPLE_STORAGE_ADDRESS,
   data,
 });

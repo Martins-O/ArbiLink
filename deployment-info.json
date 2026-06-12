@@ -1,0 +1,39 @@
+{
+  "deployedAt": "2026-02-20",
+  "contracts": {
+    "messageHub": {
+      "address": "0x9a9e7Ec4EA29bb63fE7c38E124B253b44fF897Cc",
+      "chain": "Arbitrum Sepolia",
+      "chainId": 421614,
+      "deployTx": "0x93927f5e3fc4eaeef9cd84caed9d2cec12af65f973d74fb5208e4316a31cf4f9",
+      "activationTx": "0x9ad90468abbbf8fd67b67cc528051cab5c70b65f29e948bc9a3fa9b2de8b304a",
+      "initTx": "0x9c05ae349a2031017913290ea9a018435f52c17bac16ecfa193fc651b4954368",
+      "minStake": "1000000000000000000",
+      "challengePeriod": 300
+    },
+    "receivers": {
+      "baseSepolia": {
+        "address": "0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35",
+        "chain": "Base Sepolia",
+        "chainId": 84532,
+        "deployTx": "0x009060ed97e29259b1ac90d2d8ca9406e5d2da8e34a5ebc1c63b491ea0e16574",
+        "registeredInHubTx": "0x64183524835a78db63545df0761f0af2bc2c94718aada6b53d28f219a0d8b06f",
+        "baseFee": "1000000000000000"
+      },
+      "ethSepolia": {
+        "address": "0x895058E57bBE8c84C2AABA5d61c4C739C5869F71",
+        "chain": "Ethereum Sepolia",
+        "chainId": 11155111,
+        "registeredInHubTx": "0x25967b0442c086f4e9e252b7b917f56fee3572afdfb6d92ed43a127c1c31e03b",
+        "baseFee": "1000000000000000"
+      },
+      "polygonAmoy": {
+        "address": "0x221B7Cca1C385C6c81e17b086C753328AF41AAAa",
+        "chain": "Polygon Amoy",
+        "chainId": 80002,
+        "registeredInHubTx": "0x81d90486075bcb6ff711dec87aeb0b30ec8066c06c725321b1904b5ba01e4e2b",
+        "baseFee": "1000000000000000"
+      }
+    }
+  }
+}

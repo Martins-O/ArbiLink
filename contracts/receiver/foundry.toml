@@ -3,4 +3,17 @@ src = "src"
 out = "out"
 libs = ["lib"]
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# Override with: --profile fuzz
+[profile.fuzz]
+src = "src"
+out = "out"
+libs = ["lib"]
+
+# Override with: --profile intense
+[profile.intense]
+src = "src"
+out = "out"
+libs = ["lib"]
+
+[fuzz]
+runs = 10000

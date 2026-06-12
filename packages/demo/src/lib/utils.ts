@@ -38,7 +38,9 @@ export function fmtEth(wei: bigint): string {
 
 /** Chain ID → display name */
 export const CHAIN_NAMES: Record<number, string> = {
-  421614: 'Arbitrum Sepolia',
+  421614:   'Arbitrum Sepolia',
   11155111: 'Ethereum Sepolia',
-  84532: 'Base Sepolia',
+  84532:    'Base Sepolia',
+  80002:    'Polygon Amoy',
+  11155420: 'Optimism Sepolia',
 }

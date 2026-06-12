@@ -25,6 +25,19 @@ ArbiLink is a trustless, optimistic cross-chain messaging protocol built on **Ar
 
 ---
 
+## Live Testnet Deployment
+
+| Contract | Chain | Address |
+|----------|-------|---------|
+| MessageHub | Arbitrum Sepolia | [`0x9a9e7Ec4EA29bb63fE7c38E124B253b44fF897Cc`](https://sepolia.arbiscan.io/address/0x9a9e7Ec4EA29bb63fE7c38E124B253b44fF897Cc) |
+| ArbiLinkReceiver | Base Sepolia | [`0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35`](https://sepolia.basescan.org/address/0xD45efE42904C9a27630A548A1FB6d9F133Cf5D35) |
+| ArbiLinkReceiver | Ethereum Sepolia | [`0x895058E57bBE8c84C2AABA5d61c4C739C5869F71`](https://sepolia.etherscan.io/address/0x895058E57bBE8c84C2AABA5d61c4C739C5869F71) |
+| ArbiLinkReceiver | Polygon Amoy | [`0x221B7Cca1C385C6c81e17b086C753328AF41AAAa`](https://amoy.polygonscan.com/address/0x221B7Cca1C385C6c81e17b086C753328AF41AAAa) |
+
+> Messages delivered on testnet: 3+ (Base Sepolia ×2, Ethereum Sepolia ×1)
+
+---
+
 ## Overview
 
 ArbiLink solves a simple but critical problem: **smart contracts on different chains cannot talk to each other natively**. ArbiLink provides the plumbing:
@@ -100,13 +113,13 @@ A **relayer** (any staked party) picks up the `MessageSent` event, calls `receiv
 The **ArbiLinkReceiver** verifies the ECDSA execution proof signed by the hub's signing key, checks that the message hasn't been replayed, then performs `target.call(data)` — executing the requested function on behalf of the original sender. A receipt is stored on-chain.
 
 ### Step 4 — Confirm (Arbitrum)
-The relayer calls `confirm_delivery()` on the **MessageHub**, submitting the execution proof. The hub opens a **5-minute challenge window** and immediately pays 80% of the fee to the relayer.
+The relayer calls `confirmDelivery()` on the **MessageHub**, submitting the execution proof. The hub opens a **challenge window** and immediately pays 80% of the fee to the relayer.
 
 ### Step 5 — Challenge (Optional, Arbitrum)
-Anyone who can prove the message was NOT executed (or was executed fraudulently) calls `challenge_message()` with a fraud proof during the window. A valid challenge **slashes the relayer's full stake** — 10% goes to the challenger, the rest to the protocol treasury.
+Anyone who can prove the message was NOT executed (or was executed fraudulently) calls `challengeMessage()` during the window. A valid challenge **slashes the relayer's full stake** — 10% goes to the challenger, the rest to the protocol treasury.
 
 ### Step 6 — Finalize (Arbitrum)
-After the challenge window closes without a successful challenge, `finalize_message()` marks the message as **confirmed** and increments the relayer's success count.
+After the challenge window closes without a successful challenge, `finalizeMessage()` marks the message as **confirmed** and increments the relayer's success count.
 
 ---
 
@@ -132,19 +145,38 @@ arbilink/
 │       └── foundry.toml
 │
 ├── packages/
-│   └── sdk/                      # TypeScript SDK (@arbilink/sdk)
-│       ├── src/
-│       │   ├── ArbiLink.ts       # Main SDK class
-│       │   ├── types.ts          # TypeScript types
-│       │   ├── constants.ts      # Chain configs & addresses
-│       │   ├── utils.ts          # Encoding & formatting helpers
-│       │   ├── index.ts          # Public exports
-│       │   └── abi/
-│       │       ├── MessageHub.json   # Hub ABI
-│       │       └── Receiver.json     # Receiver ABI
-│       ├── package.json
-│       └── tsconfig.json
+│   ├── sdk/                      # TypeScript SDK (@arbilink/sdk)
+│   │   ├── src/
+│   │   │   ├── ArbiLink.ts       # Main SDK class
+│   │   │   ├── types.ts          # TypeScript types
+│   │   │   ├── constants.ts      # Chain configs & addresses
+│   │   │   ├── utils.ts          # Encoding & formatting helpers
+│   │   │   ├── index.ts          # Public exports
+│   │   │   └── abi/
+│   │   │       ├── MessageHub.json   # Hub ABI
+│   │   │       └── Receiver.json     # Receiver ABI
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── relayer/                  # Off-chain relayer bot (TypeScript)
+│   │   ├── src/index.ts          # Event watcher + delivery loop
+│   │   ├── package.json
+│   │   └── tsconfig.json
+│   │
+│   ├── demo/                     # Live demo dApp (React + Vite)
+│   │   ├── src/
+│   │   │   ├── pages/            # Home, Explorer, Send
+│   │   │   ├── components/       # MessageCard, StatsCards, etc.
+│   │   │   └── hooks/            # useMessages, useSendMessage
+│   │   └── vercel.json           # Vercel deployment config
+│   │
+│   └── docs/                     # Documentation site (VitePress)
+│       ├── getting-started/
+│       ├── api/
+│       └── .vitepress/
 │
+├── Dockerfile                    # Relayer container (for Render)
+├── render.yaml                   # Render deployment config
 ├── scripts/
 │   ├── deploy.sh                 # Full multi-chain deployment
 │   └── verify.sh                 # Block explorer verification
@@ -171,15 +203,19 @@ The hub is the heart of the protocol, deployed on **Arbitrum Sepolia** as a WASM
 
 | Function | Description |
 |----------|-------------|
-| `send_message(chain, target, data)` | Send a cross-chain message (payable) |
-| `confirm_delivery(id, proof)` | Relayer confirms execution with proof |
-| `challenge_message(id, proof)` | Challenge a fraudulent delivery |
-| `finalize_message(id)` | Finalize after challenge window |
-| `register_relayer()` | Stake ETH to become a relayer (payable) |
-| `exit_relayer()` | Withdraw stake and deregister |
-| `add_chain(chainId, receiver, fee)` | Owner: register a destination chain |
-| `calculate_fee(chainId)` | View: get base fee for a destination |
-| `get_message_status(id)` | View: 0=Pending 1=Relayed 2=Confirmed 3=Failed |
+| `sendMessage(chain, target, data)` | Send a cross-chain message (payable) |
+| `confirmDelivery(id, proof)` | Relayer confirms execution with proof, opens challenge window |
+| `challengeMessage(id)` | Challenge a fraudulent delivery during window (slashes relayer) |
+| `finalizeMessage(id)` | Finalize after challenge window expires |
+| `withdrawProtocolFees()` | Owner: drain accumulated protocol fees |
+| `registerRelayer()` | Stake ETH to become a relayer (payable) |
+| `exitRelayer()` | Withdraw stake and deregister |
+| `addChain(chainId, receiver, fee)` | Owner: register a destination chain |
+| `calculateFee(chainId)` | View: get base fee for a destination |
+| `getMessageStatus(id)` | View: 0=Pending 1=Relayed 2=Confirmed 3=Failed |
+| `getRelayerInfo(addr)` | View: active, stake, successfulDeliveries |
+| `protocolFeeBalance()` | View: accumulated protocol fees (wei) |
+| `challengePeriod()` | View: challenge window duration (seconds) |
 
 ---
 
@@ -237,7 +273,7 @@ npm install @arbilink/sdk ethers
 | [Rust](https://rustup.rs) | 1.88.0 (pinned) | Stylus contract compilation |
 | [cargo-stylus](https://github.com/OffchainLabs/cargo-stylus) | latest | Stylus deploy & verify |
 | [Foundry](https://getfoundry.sh) | latest | Solidity compile, test, deploy |
-| Node.js | ≥ 18 | SDK development |
+| Node.js | ≥ 22 | SDK, relayer, demo |
 | pnpm | latest | SDK package manager |
 | [cast](https://book.getfoundry.sh/cast/) | (part of Foundry) | Contract calls via CLI |
 
@@ -337,6 +373,35 @@ bash scripts/verify.sh
 
 ---
 
+## Running the Relayer
+
+The relayer bot watches `MessageSent` events on Arbitrum Sepolia, delivers messages to destination chains, and calls `confirmDelivery` on the hub. It must run continuously for messages to progress past `pending`.
+
+### Locally
+
+```bash
+PRIVATE_KEY=0x... INFURA_KEY=... node --experimental-strip-types packages/relayer/src/index.ts
+```
+
+### Render (Recommended)
+
+A `render.yaml` and `Dockerfile` are included at the repo root. No CLI needed.
+
+1. Go to [render.com](https://render.com) → **New → Blueprint**
+2. Connect your GitHub repo — Render picks up `render.yaml` automatically
+3. Add your environment variables when prompted:
+
+| Variable | Description |
+|----------|-------------|
+| `PRIVATE_KEY` | Relayer wallet private key (must be registered on the hub) |
+| `INFURA_KEY` | Infura project ID (for Arbitrum Sepolia + Ethereum Sepolia RPC) |
+
+4. Click **Apply** — Render builds the Docker image and starts the worker
+
+The relayer registers itself on-chain automatically on first start if not already staked.
+
+---
+
 ## SDK Integration
 
 ### Install
@@ -416,7 +481,7 @@ PENDING ──► RELAYED ──► CONFIRMED
 | Status Code | Name | Meaning |
 |-------------|------|---------|
 | 0 | `PENDING` | Sent but not yet delivered |
-| 1 | `RELAYED` | Delivered — in 5-min challenge window |
+| 1 | `RELAYED` | Delivered — in challenge window |
 | 2 | `CONFIRMED` | Challenge window closed, message finalized |
 | 3 | `FAILED` | Relayer was slashed via fraud proof |
 
@@ -435,6 +500,7 @@ PENDING ──► RELAYED ──► CONFIRMED
 | Arbitrum Sepolia | 421614 | Hub (source) |
 | Ethereum Sepolia | 11155111 | Destination |
 | Base Sepolia | 84532 | Destination |
+| Polygon Amoy | 80002 | Destination |
 
 ---
 
@@ -481,7 +547,7 @@ ArbiLink uses an **optimistic** security model — it assumes messages are deliv
 - **ECDSA proof verification** — the receiver will not execute any message that isn't signed by the hub's designated signing key, preventing forgery.
 - **CEI pattern** — the receiver marks a message as processed *before* making the external call, preventing reentrancy exploits.
 
-> **Note:** The hackathon version uses simplified proof stubs in the hub (`proof.len() >= 65 && proof[0] != 0`). A production deployment would replace these with full `ecrecover` verification against the destination receiver's signing key.
+> **Note:** The proof parameter in `confirmDelivery` is accepted but not yet verified on-chain (intended for future `ecrecover` integration). Relayer fraud is currently detected via timely challenges during the challenge window.
 
 ---
 

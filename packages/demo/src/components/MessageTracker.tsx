@@ -1,12 +1,15 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, Clock, Loader2, Send } from 'lucide-react';
+import { CheckCircle2, Clock, Loader2, Send, ExternalLink } from 'lucide-react';
 import type { SimulationStep } from '../lib/types';
+import { shortAddress } from '../lib/utils';
 
 interface MessageTrackerProps {
   messageId: string;
   steps: SimulationStep[];
   progress: number;
   destination: string;
+  txHash?: string | null;
+  senderAddress?: string | null;
 }
 
 export function MessageTracker({
@@ -14,6 +17,8 @@ export function MessageTracker({
   steps,
   progress,
   destination,
+  txHash,
+  senderAddress,
 }: MessageTrackerProps) {
   const done = progress >= 100;
 
@@ -103,24 +108,36 @@ export function MessageTracker({
       >
         <div className="flex justify-between">
           <span className="text-slate-400">Sender</span>
-          <span className="text-white font-mono">0xabc...def</span>
+          <span className="text-white font-mono">
+            {senderAddress ? shortAddress(senderAddress) : '0xabc…def'}
+          </span>
         </div>
         <div className="flex justify-between">
           <span className="text-slate-400">Destination</span>
           <span className="text-white capitalize">{destination}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-400">Target Contract</span>
-          <span className="text-white font-mono">0x742d...44e</span>
+          <span className="text-slate-400">Target</span>
+          <span className="text-white font-mono">
+            {senderAddress ? shortAddress(senderAddress) : '0x742d…44e'}
+          </span>
         </div>
-        {progress > 25 && (
+        {txHash && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex justify-between"
+            className="flex justify-between items-center"
           >
-            <span className="text-slate-400">Relayer</span>
-            <span className="text-white font-mono">0x123...789</span>
+            <span className="text-slate-400">Tx Hash</span>
+            <a
+              href={`https://sepolia.arbiscan.io/tx/${txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-blue-400 hover:text-blue-300 font-mono text-xs transition-colors"
+            >
+              {shortAddress(txHash)}
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </motion.div>
         )}
         {done && (
@@ -130,7 +147,7 @@ export function MessageTracker({
             className="pt-2 border-t border-slate-700 flex items-center gap-2 text-green-400 font-semibold text-xs"
           >
             <CheckCircle2 className="w-4 h-4" />
-            Message delivered successfully
+            Message delivered successfully on-chain
           </motion.div>
         )}
       </motion.div>

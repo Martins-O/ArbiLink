@@ -25,7 +25,8 @@ echo "  Verifying MessageHub on Arbitrum Sepolia..."
 cargo +1.88.0 stylus verify \
     --endpoint="https://sepolia-rollup.arbitrum.io/rpc" \
     --deployment-tx="" \
-    "${ROOT}/message-hub" 2>/dev/null || echo "   ⚠️  Stylus verification requires --deployment-tx"
+    "${ROOT}/message-hub" 2>/dev/null
+echo "   ℹ️  Stylus verification requires --deployment-tx — provide it if this fails"
 
 # Receiver on Ethereum Sepolia
 echo "  Verifying ETH Receiver on Etherscan..."
@@ -35,7 +36,7 @@ forge verify-contract \
     --etherscan-api-key "${ETHERSCAN_API_KEY}" \
     --constructor-args "$(cast abi-encode 'constructor(address,address)' "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}")" \
     "${ETH_RECEIVER}" \
-    "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver" || true
+    "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver"
 
 # Receiver on Base Sepolia
 echo "  Verifying Base Receiver on Basescan..."
@@ -46,6 +47,6 @@ forge verify-contract \
     --verifier-url "https://api-sepolia.basescan.org/api" \
     --constructor-args "$(cast abi-encode 'constructor(address,address)' "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}")" \
     "${BASE_RECEIVER}" \
-    "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver" || true
+    "${ROOT}/contracts/receiver/src/ArbiLinkReceiver.sol:ArbiLinkReceiver"
 
 echo "✅  Verification complete!"

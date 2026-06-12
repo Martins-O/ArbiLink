@@ -90,7 +90,17 @@ export function estimateDeliveryTime(chainId: number): number {
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
-const STATUS_MAP: MessageStatus[] = ['pending', 'relayed', 'confirmed', 'failed'];
+// Matches STATUS_* constants in the MessageHub contract:
+//   0 = PENDING     → 'pending'
+//   1 = RELAYED     → 'relayed'
+//   2 = CONFIRMED   → 'confirmed'
+//   3 = FAILED      → 'failed'
+const STATUS_MAP: Record<number, MessageStatus> = {
+  0: 'pending',
+  1: 'relayed',
+  2: 'confirmed',
+  3: 'failed',
+};
 
 /**
  * Convert the on-chain numeric status code to the SDK string representation.
