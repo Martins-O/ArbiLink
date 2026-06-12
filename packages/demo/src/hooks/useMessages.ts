@@ -26,8 +26,8 @@ function deriveStatus(
   return 'pending'
 }
 
-export function useMessages(mockMessages: Message[]) {
-  const [messages, setMessages] = useState<Message[]>(mockMessages)
+export function useMessages() {
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading,  setLoading]  = useState(false)
   const [isLive,   setIsLive]   = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)

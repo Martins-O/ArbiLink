@@ -1,13 +1,13 @@
-# @arbilink/sdk
+# @arbilink/sdk &middot; [![npm version](https://img.shields.io/npm/v/@arbilink/sdk)](https://www.npmjs.com/package/@arbilink/sdk) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Cross-chain messaging made simple. Send messages from **Arbitrum** to any supported chain with a single function call.
-
-Built on top of the ArbiLink MessageHub — an optimistic cross-chain relay protocol running on Arbitrum Stylus.
+Send messages from **Arbitrum Sepolia** to any supported chain with a single function call. Built on the ArbiLink MessageHub — an optimistic cross-chain relay protocol running on [Arbitrum Stylus](https://arbitrum.io/stylus).
 
 ## Installation
 
 ```bash
 npm install @arbilink/sdk ethers
+# or
+pnpm add @arbilink/sdk ethers
 # or
 yarn add @arbilink/sdk ethers
 ```
@@ -19,17 +19,13 @@ import { ArbiLink, encodeCall } from '@arbilink/sdk';
 import { ethers }                from 'ethers';
 import { parseAbi }              from 'viem';
 
-// 1. Connect a signer (must be on Arbitrum Sepolia)
 const provider = new ethers.BrowserProvider(window.ethereum);
 const signer   = await provider.getSigner();
-
-// 2. Initialise
 const arbiLink = new ArbiLink(signer);
 
-// 3. Send a cross-chain message
 const messageId = await arbiLink.sendMessage({
-  to:     'ethereum',           // destination chain name or numeric ID
-  target: '0x742d35Cc...',     // contract to call on the destination chain
+  to:     'ethereum',
+  target: '0x742d35Cc...',
   data:   encodeCall({
     abi:          parseAbi(['function mint(address to, uint256 amount)']),
     functionName: 'mint',
@@ -39,7 +35,6 @@ const messageId = await arbiLink.sendMessage({
 
 console.log('Message sent! ID:', messageId);
 
-// 4. Watch for delivery
 const unwatch = arbiLink.watchMessage(messageId, (msg) => {
   console.log('Status update:', msg.status);
   if (msg.status === 'confirmed') {
@@ -62,14 +57,18 @@ const unwatch = arbiLink.watchMessage(messageId, (msg) => {
 
 ### `sendMessage(params)` → `Promise<bigint>`
 
-Send a cross-chain message. Returns the message ID.
+| Param | Type | Description |
+|-------|------|-------------|
+| `to` | `string \| number` | Chain name (`'ethereum'`, `'base'`, `'polygon'`, `'optimism'`) or numeric chain ID |
+| `target` | `string` | Contract address on the destination chain |
+| `data` | `string` | Encoded calldata (use `encodeCall()` helper) |
+| `fee` | `bigint` | *(optional)* Message fee in wei — auto-fetched from the hub if omitted |
 
 ```typescript
 const messageId = await arbiLink.sendMessage({
-  to:     'base',           // 'ethereum' | 'base' | 'polygon' | 'optimism' | chainId
+  to:     'base',
   target: '0xTarget...',
   data:   '0xcalldata...',
-  fee:    1_000_000_000_000_000n, // optional – fetched from hub if omitted
 });
 ```
 
@@ -100,8 +99,7 @@ console.log(formatEth(fee)); // "0.001 ETH"
 
 ### `watchMessage(messageId, callback)` → `() => void`
 
-Subscribe to `MessageConfirmed` and `MessageChallenged` events.
-Returns an **unsubscribe** function.
+Subscribe to `MessageConfirmed` and `MessageChallenged` events. Returns an **unsubscribe** function.
 
 ```typescript
 const unwatch = arbiLink.watchMessage(messageId, (msg) => {
@@ -127,50 +125,47 @@ console.log(info?.baseFee);          // bigint
 ### `registerRelayer(stakeOverride?)` / `exitRelayer()`
 
 ```typescript
-// Register with the hub's minimum stake
-await arbiLink.registerRelayer();
-
-// Or override the stake amount
+await arbiLink.registerRelayer();                        // hub's minimum stake
 await arbiLink.registerRelayer(2_000_000_000_000_000_000n); // 2 ETH
-
-// Withdraw stake and deregister
-await arbiLink.exitRelayer();
+await arbiLink.exitRelayer();                            // withdraw & deregister
 ```
 
 ---
 
 ## Utility Functions
 
-```typescript
-import {
-  encodeCall,
-  formatMessageId,
-  formatEth,
-  statusLabel,
-  estimateDeliveryTime,
-} from '@arbilink/sdk';
-
-encodeCall({ abi, functionName, args });  // → '0x...'
-formatMessageId(42n);                      // → '#000042'
-formatEth(1_000_000_000_000_000n);        // → '0.001 ETH'
-statusLabel('confirmed');                  // → 'Confirmed'
-estimateDeliveryTime(11155111);            // → seconds (int)
-```
+| Function | Returns | Example |
+|----------|---------|---------|
+| `encodeCall({ abi, functionName, args })` | `string` (hex) | `encodeCall({ abi, functionName: 'mint', args: [...] })` |
+| `formatMessageId(id)` | `string` | `formatMessageId(42n)` → `'#000042'` |
+| `formatEth(wei)` | `string` | `formatEth(1_000_000_000_000_000n)` → `'0.001 ETH'` |
+| `statusLabel(status)` | `string` | `statusLabel('confirmed')` → `'Confirmed'` |
+| `estimateDeliveryTime(chainId)` | `number` (sec) | `estimateDeliveryTime(11155111)` |
 
 ---
 
 ## Supported Chains
 
-| Chain | Name | Chain ID | Status |
-|-------|------|----------|--------|
-| Ethereum Sepolia | `'ethereum'` | 11155111 | ✅ Supported |
-| Base Sepolia | `'base'` | 84532 | ✅ Supported |
-| Polygon Amoy | `'polygon'` | 80002 | 🔜 Coming soon |
+| Chain | Name | Chain ID | Receiver |
+|-------|------|----------|----------|
+| Ethereum Sepolia | `'ethereum'` | 11155111 | ✅ Deployed |
+| Base Sepolia | `'base'` | 84532 | ✅ Deployed |
+| Polygon Amoy | `'polygon'` | 80002 | ✅ Deployed |
 | Optimism Sepolia | `'optimism'` | 11155420 | 🔜 Coming soon |
 
 ---
 
-## Full Examples
+## How ArbiLink Works
+
+1. **User** calls `sendMessage()` on the **MessageHub** (Arbitrum Stylus).
+2. **Relayers** watch for `MessageSent` events and deliver the message on the destination chain via `ArbiLinkReceiver.receiveMessage()`.
+3. The relayer submits an **ECDSA execution proof** and calls `confirmDelivery()` on the hub, opening a **5-minute challenge window**.
+4. Anyone can call `challengeMessage()` with a fraud proof during that window. A valid fraud proof **slashes the relayer's stake**.
+5. After the window closes without a challenge, `finalizeMessage()` marks the message as **confirmed**.
+
+---
+
+## Examples
 
 ### NFT Mint on Ethereum
 
@@ -196,55 +191,42 @@ const messageId = await arbiLink.sendMessage({
 ### Token Transfer on Base
 
 ```typescript
-const data = encodeCall({
-  abi:          parseAbi(['function transfer(address to, uint256 amount)']),
-  functionName: 'transfer',
-  args:         [recipient, amount],
-});
-
 const messageId = await arbiLink.sendMessage({
   to:     'base',
   target: TOKEN_CONTRACT_ADDRESS,
-  data,
+  data:   encodeCall({
+    abi:          parseAbi(['function transfer(address to, uint256 amount)']),
+    functionName: 'transfer',
+    args:         [recipient, amount],
+  }),
 });
 ```
 
-### Read-only status polling (no wallet required)
+### Read-only polling (no wallet)
 
 ```typescript
 import { ArbiLink } from '@arbilink/sdk';
 import { ethers }   from 'ethers';
 
 const provider = new ethers.JsonRpcProvider('https://sepolia-rollup.arbitrum.io/rpc');
-const arbiLink  = new ArbiLink(provider);
+const arbiLink = new ArbiLink(provider);
 
 const msg = await arbiLink.getMessageStatus(42n);
-console.log(msg.status); // 'confirmed'
+console.log(msg.status);
 ```
-
----
-
-## How ArbiLink Works
-
-1. **User** calls `sendMessage()` on the **MessageHub** (Arbitrum Stylus).
-2. **Relayers** watch for `MessageSent` events and deliver the message on the destination chain via `ArbiLinkReceiver.receiveMessage()`.
-3. The relayer submits an **ECDSA execution proof** and calls `confirm_delivery()` on the hub, opening a **5-minute challenge window**.
-4. Anyone can call `challenge_message()` with a fraud proof during that window. A valid fraud proof **slashes the relayer's stake**.
-5. After the window closes without a challenge, `finalize_message()` marks the message as **confirmed**.
 
 ---
 
 ## Configuration
 
-After running `scripts/deploy.sh`, update `src/constants.ts` with your deployed addresses:
+After deploying contracts, update `src/constants.ts` with your addresses:
 
 ```typescript
-// packages/sdk/src/constants.ts
-export const MESSAGE_HUB_ADDRESS = '0xYourMessageHubAddress';
-
+export const MESSAGE_HUB_ADDRESS = '0x...';
 export const RECEIVER_ADDRESSES: Record<number, string> = {
-  11155111: '0xYourEthReceiver',
-  84532:    '0xYourBaseReceiver',
+  11155111: '0x...',
+  84532:    '0x...',
+  80002:    '0x...',
 };
 ```
 

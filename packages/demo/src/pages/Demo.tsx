@@ -234,18 +234,30 @@ export function Demo() {
                 { icon: Clock,        color: 'blue',   label: 'Est. Time', value: '~15s'  },
                 { icon: Zap,          color: 'green',  label: 'Cost',      value: '0.001 ETH' },
                 { icon: TrendingDown, color: 'purple', label: 'Savings',   value: '95%'  },
-              ].map(({ icon: Icon, color, label, value }) => (
-                <div
-                  key={label}
-                  className={`bg-gradient-to-br from-${color}-950 to-${color}-900/50 border border-${color}-500/40 rounded-xl p-4`}
-                >
-                  <div className={`flex items-center gap-1.5 text-${color}-400 text-xs mb-1.5`}>
-                    <Icon className="w-3 h-3" />
-                    {label}
+              ].map(({ icon: Icon, color, label, value }) => {
+                const gradientClass = color === 'blue'
+                  ? 'bg-gradient-to-br from-blue-950 to-blue-900/50 border border-blue-500/40'
+                  : color === 'green'
+                    ? 'bg-gradient-to-br from-green-950 to-green-900/50 border border-green-500/40'
+                    : 'bg-gradient-to-br from-purple-950 to-purple-900/50 border border-purple-500/40';
+                const textClass = color === 'blue'
+                  ? 'text-blue-400'
+                  : color === 'green'
+                    ? 'text-green-400'
+                    : 'text-purple-400';
+                return (
+                  <div
+                    key={label}
+                    className={`${gradientClass} rounded-xl p-4`}
+                  >
+                    <div className={`flex items-center gap-1.5 ${textClass} text-xs mb-1.5`}>
+                      <Icon className="w-3 h-3" />
+                      {label}
+                    </div>
+                    <div className="text-lg font-bold text-white">{value}</div>
                   </div>
-                  <div className="text-lg font-bold text-white">{value}</div>
-                </div>
-              ))}
+                );
+              })}
             </motion.div>
           </div>
 
