@@ -1,0 +1,42 @@
+name: Publish SDK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/sdk/**'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+      - run: pnpm install --no-frozen-lockfile --ignore-scripts
+
+      - name: Check version change
+        id: check
+        run: |
+          CURRENT=$(node -p "require('./packages/sdk/package.json').version")
+          PUBLISHED=$(npm view @arbilink/sdk version 2>/dev/null || echo "0.0.0")
+          if [ "$PUBLISHED" = "$CURRENT" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run tests
+        if: steps.check.outputs.changed == 'true'
+        run: pnpm --filter @arbilink/sdk test
+
+      - name: Publish to npm
+        if: steps.check.outputs.changed == 'true'
+        run: pnpm --filter @arbilink/sdk publish --access public --no-git-checks
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
