@@ -61,5 +61,6 @@ jobs:
         with:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge install foundry-rs/forge-std --no-commit 2>&1 || echo "forge-std already installed"
       - run: forge test
         working-directory: contracts/receiver
