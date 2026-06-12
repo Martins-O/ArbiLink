@@ -15,14 +15,11 @@
 
 import { ethers } from 'ethers';
 import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import path from 'path';
 import http from 'http';
 
 const require = createRequire(import.meta.url);
 
 // ── ABI imports ────────────────────────────────────────────────────────────────
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const MessageHubABI: any[] = require('../../sdk/src/abi/MessageHub.json');
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

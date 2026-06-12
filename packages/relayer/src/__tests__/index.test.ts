@@ -1,29 +1,8 @@
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 
 // ── Partially mock ethers: real crypto, fake network classes ──────────────
 vi.mock('ethers', async () => {
   const actual = await vi.importActual<typeof import('ethers')>('ethers');
-
-  const mockProvider = {
-    getBlockNumber:       vi.fn().mockResolvedValue(100_000),
-    getBalance:           vi.fn().mockResolvedValue(actual.parseEther('10')),
-    getNetwork:           vi.fn().mockResolvedValue({ chainId: 421614n, name: 'arbitrum-sepolia' }),
-    getFeeData:           vi.fn().mockResolvedValue({ gasPrice: 1n, maxFeePerGas: 1n, maxPriorityFeePerGas: 1n }),
-    call:                 vi.fn(),
-    estimateGas:          vi.fn().mockResolvedValue(100_000n),
-    getTransaction:       vi.fn(),
-    getTransactionCount:  vi.fn().mockResolvedValue(1),
-    getBlock:             vi.fn(),
-    send:                 vi.fn(),
-    destroy:              vi.fn(),
-    on:                   vi.fn(),
-    off:                  vi.fn(),
-    once:                 vi.fn(),
-    emit:                 vi.fn(),
-    listenerCount:        vi.fn().mockReturnValue(0),
-    listeners:            vi.fn().mockReturnValue([]),
-    removeAllListeners:   vi.fn(),
-  };
 
   const mockContractFns: Record<string, ReturnType<typeof vi.fn>> = {};
   function getMockFn(name: string) {
@@ -102,12 +81,12 @@ afterAll(() => {
 
 describe('requireEnv', () => {
   it('returns value when env var is set', async () => {
-    const { requireEnv } = await import('../index');
+    const { requireEnv } = await import('../index.js');
     expect(requireEnv('PRIVATE_KEY')).toBe(TEST_PK);
   });
 
   it('throws when env var is missing', async () => {
-    const { requireEnv } = await import('../index');
+    const { requireEnv } = await import('../index.js');
     delete process.env.MISSING_VAR;
     expect(() => requireEnv('MISSING_VAR')).toThrow('Missing env var: MISSING_VAR');
   });
@@ -115,7 +94,7 @@ describe('requireEnv', () => {
 
 describe('signMessage', () => {
   it('returns a 132-char hex string (65-byte signature)', async () => {
-    const { signMessage } = await import('../index');
+    const { signMessage } = await import('../index.js');
     const wallet = new (await import('ethers')).ethers.Wallet(SIGNING_PK);
     const sig = await signMessage(
       { id: 1n, sender: wallet.address, target: '0x0000000000000000000000000000000000000000', data: '0x', sourceChain: 421614, destinationChain: 11155111 },
@@ -125,7 +104,7 @@ describe('signMessage', () => {
   });
 
   it('recovering the signer from signature yields the signing wallet address', async () => {
-    const { signMessage, MessageStruct } = await import('../index');
+    const { signMessage } = await import('../index.js');
     const { ethers } = await import('ethers');
     const wallet = new ethers.Wallet(SIGNING_PK);
     const message = { id: 42n, sender: wallet.address, target: '0x0000000000000000000000000000000000000000', data: '0xdeadbeef', sourceChain: 421614, destinationChain: 84532 };
@@ -145,7 +124,7 @@ describe('signMessage', () => {
   });
 
   it('different messages produce different signatures', async () => {
-    const { signMessage } = await import('../index');
+    const { signMessage } = await import('../index.js');
     const { ethers } = await import('ethers');
     const wallet = new ethers.Wallet(SIGNING_PK);
 
@@ -162,7 +141,7 @@ describe('signMessage', () => {
   });
 
   it('matching the relayer hub signing key recovers to the expected address', async () => {
-    const { signMessage } = await import('../index');
+    const { signMessage } = await import('../index.js');
     const { ethers } = await import('ethers');
     const wallet = new ethers.Wallet(SIGNING_PK);
 
@@ -175,6 +154,28 @@ describe('signMessage', () => {
     const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
       ['tuple(uint256 id,address sender,address target,bytes data,uint32 sourceChain)'],
       [[7n, wallet.address, '0x0000000000000000000000000000000000000000', '0x1234', 421614]],
+    );
+    const msgHash = ethers.keccak256(encoded);
+    const recovered = ethers.verifyMessage(ethers.getBytes(msgHash), sig);
+    expect(recovered.toLowerCase()).toBe(wallet.address.toLowerCase());
+  });
+
+  it('signs messages with large data payloads correctly', async () => {
+    const { signMessage } = await import('../index.js');
+    const { ethers } = await import('ethers');
+    const wallet = new ethers.Wallet(SIGNING_PK);
+    const largeData = '0x' + 'ab'.repeat(1024);
+
+    const sig = await signMessage(
+      { id: 99n, sender: wallet.address, target: '0x0000000000000000000000000000000000000000', data: largeData, sourceChain: 421614, destinationChain: 11155111 },
+      wallet,
+    );
+    expect(sig).toMatch(/^0x[0-9a-f]{130}$/);
+
+    // Verify recovery still works
+    const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
+      ['tuple(uint256 id,address sender,address target,bytes data,uint32 sourceChain)'],
+      [[99n, wallet.address, '0x0000000000000000000000000000000000000000', largeData, 421614]],
     );
     const msgHash = ethers.keccak256(encoded);
     const recovered = ethers.verifyMessage(ethers.getBytes(msgHash), sig);

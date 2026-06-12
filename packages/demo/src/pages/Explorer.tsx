@@ -38,7 +38,7 @@ export default function Explorer() {
   const [filter, setFilter] = useState<Filter>('all')
   const [search, setSearch] = useState('')
 
-  const { messages, loading, isLive } = useMessages([])
+  const { messages, loading, isLive } = useMessages()
   const chartData = buildChartData(messages)
 
   const filtered = messages.filter(m => {
