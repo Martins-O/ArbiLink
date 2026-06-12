@@ -9,10 +9,16 @@
  *   node scripts/smoke-test.mjs
  */
 
-import { ethers } from '../packages/sdk/node_modules/ethers/lib.esm/index.js';
+import { createRequire } from 'module';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
+
+// Resolve ethers from the relayer package (which has it as a dependency)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const relayerPkg = path.resolve(__dirname, '..', 'packages', 'relayer', 'package.json');
+const require = createRequire(relayerPkg);
+const ethers = require('ethers');
 
 // ── Load .env ─────────────────────────────────────────────────────────────────
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

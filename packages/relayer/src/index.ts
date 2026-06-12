@@ -58,11 +58,12 @@ const POLL_INTERVAL_MS = 10_000;
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface MessageStruct {
-  id:          bigint;
-  sender:      string;
-  target:      string;
-  data:        string;
-  sourceChain: number;
+  id:               bigint;
+  sender:           string;
+  target:           string;
+  data:             string;
+  sourceChain:      number;
+  destinationChain: number;
 }
 
 // ── Env ────────────────────────────────────────────────────────────────────────
@@ -109,20 +110,10 @@ async function relayMessage(
   relayerWallet: ethers.Wallet,
   signingWallet: ethers.Wallet,
 ): Promise<void> {
-  const destChainId = Number(message.sourceChain === ARBITRUM_SEPOLIA_CHAIN_ID
-    ? 0  // guard — should never happen
-    : message.id); // unused here; we use the destinationChain from the event
-
-  // destinationChain is passed in via message struct for routing, but in the
-  // MessageSent event it's a separate arg. The caller resolves this before
-  // calling us — see processEvent().
-  void destChainId; // silence unused var
-
-  const chainId = (message as MessageStruct & { destinationChain: number }).destinationChain;
-  const chain   = CHAINS[chainId];
+  const chain   = CHAINS[message.destinationChain];
 
   if (!chain) {
-    console.warn(`  ⚠  No receiver config for chain ${chainId} — skipping`);
+    console.warn(`  ⚠  No receiver config for chain ${message.destinationChain} — skipping`);
     return;
   }
 
@@ -207,7 +198,7 @@ async function processEvent(
     return;
   }
 
-  const message: MessageStruct & { destinationChain: number } = {
+  const message: MessageStruct = {
     id:               messageId,
     sender,
     target,
