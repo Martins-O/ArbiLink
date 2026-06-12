@@ -2,7 +2,14 @@
   "name": "@arbilink/sdk",
   "version": "0.1.2",
   "description": "Cross-chain messaging SDK for Arbitrum — send messages to any chain with one function call",
-  "keywords": ["arbitrum", "cross-chain", "messaging", "bridge", "stylus", "web3"],
+  "keywords": [
+    "arbitrum",
+    "cross-chain",
+    "messaging",
+    "bridge",
+    "stylus",
+    "web3"
+  ],
   "license": "MIT",
   "author": "ArbiLink",
   "repository": {
@@ -10,7 +17,7 @@
     "url": "https://github.com/Martins-O/ArbiLink.git",
     "directory": "packages/sdk"
   },
-  "main":  "dist/index.js",
+  "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
@@ -21,21 +28,28 @@
       "default": "./src/abi/*.json"
     }
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "build":          "tsc --project tsconfig.json",
-    "build:watch":    "tsc --project tsconfig.json --watch",
-    "clean":          "rm -rf dist",
-    "type-check":     "tsc --noEmit",
+    "build": "tsc --project tsconfig.json",
+    "build:watch": "tsc --project tsconfig.json --watch",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "prepublishOnly": "pnpm run clean && pnpm run build"
   },
   "dependencies": {
     "ethers": "^6.9.0",
-    "viem":   "^2.0.0"
+    "viem": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript":  "^5.3.0"
+    "typescript": "^5.3.0",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.8"
   },
   "engines": {
     "node": ">=18.0.0"
