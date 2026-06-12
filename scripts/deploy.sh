@@ -46,6 +46,7 @@ echo ""
 ARB_SEPOLIA_RPC="https://sepolia-rollup.arbitrum.io/rpc"
 ETH_SEPOLIA_RPC="https://sepolia.infura.io/v3/${INFURA_KEY}"
 BASE_SEPOLIA_RPC="https://sepolia.base.org"
+POLYGON_AMOY_RPC="https://rpc-amoy.polygon.technology"
 
 # Contract parameters
 MIN_STAKE="1000000000000000000"   # 1 ETH in wei
@@ -203,6 +204,24 @@ cast send \
     84532 "${BASE_RECEIVER}" 1000000000000000
 ok "Base Sepolia registered"
 
+# ── Step 6b: Deploy Receiver to Polygon Amoy ────────────────────────────────
+echo ""
+echo "🚀  Deploying ArbiLinkReceiver to Polygon Amoy..."
+POLYGON_RECEIVER=$(deploy_receiver "${POLYGON_AMOY_RPC}")
+if [[ -z "${POLYGON_RECEIVER}" ]]; then
+    warn "Polygon Amoy receiver deployment failed — skipping (chain may be unavailable)"
+else
+    ok "Polygon Receiver deployed: ${POLYGON_RECEIVER}"
+    echo "   Registering Polygon Amoy in MessageHub..."
+    cast send \
+        --rpc-url="${ARB_SEPOLIA_RPC}" \
+        --private-key="${PRIVATE_KEY}" \
+        "${MESSAGE_HUB}" \
+        "addChain(uint32,address,uint256)" \
+        80002 "${POLYGON_RECEIVER}" 1000000000000000
+    ok "Polygon Amoy registered"
+fi
+
 # ── Step 7: Save deployment info ──────────────────────────────────────────────
 DEPLOY_FILE="${ROOT}/deployment-info.json"
 cat > "${DEPLOY_FILE}" <<EOF
@@ -223,6 +242,11 @@ cat > "${DEPLOY_FILE}" <<EOF
     "receiver": "${BASE_RECEIVER}",
     "rpc": "${BASE_SEPOLIA_RPC}"
   },
+  "polygon_amoy": {
+    "chainId": 80002,
+    "receiver": "${POLYGON_RECEIVER}",
+    "rpc": "${POLYGON_AMOY_RPC}"
+  },
   "config": {
     "minStake":        "${MIN_STAKE}",
     "challengePeriod": "${CHALLENGE_PERIOD}",
@@ -240,6 +264,7 @@ echo "╠═══════════════════════�
 printf "║  MessageHub (Arb Sepolia):  %-33s ║\n" "${MESSAGE_HUB}"
 printf "║  ETH Receiver:              %-33s ║\n" "${ETH_RECEIVER}"
 printf "║  Base Receiver:             %-33s ║\n" "${BASE_RECEIVER}"
+printf "║  Polygon Receiver:          %-33s ║\n" "${POLYGON_RECEIVER:-skipped}"
 echo "╚═══════════════════════════════════════════════════════════════╝"
 echo ""
 echo "Next steps:"
