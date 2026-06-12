@@ -4,7 +4,7 @@
 
 **What chains does ArbiLink support?**
 
-Currently Ethereum Sepolia and Base Sepolia (testnet). Mainnet chains (Ethereum, Base, Polygon, Optimism) are on the roadmap.
+Ethereum Sepolia, Base Sepolia, and Polygon Amoy (testnets). Mainnet chains (Ethereum, Base, Polygon, Optimism) are on the roadmap.
 
 **Is ArbiLink trustless?**
 
@@ -41,7 +41,7 @@ Yes, as long as:
 fee = baseFee[chainId] + gasPrice * estimatedGas
 ```
 
-The SDK calls `get_fee(chainId)` on the MessageHub contract for the current fee.
+The SDK calls `calculateFee(chainId)` on the MessageHub contract for the current fee.
 
 **Can messages fail?**
 
@@ -97,4 +97,4 @@ For production use, yes — or rely on the public relayer network once it's avai
 
 **Is there a gas estimation tool?**
 
-Use `arbiLink.calculateFee(chainId)` to get the current fee. For Solidity testing, use `hub.get_fee(chainId)`.
+Use `arbiLink.calculateFee(chainId)` to get the current fee. For Solidity testing, use `hub.calculateFee(chainId)`.

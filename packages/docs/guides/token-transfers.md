@@ -48,7 +48,7 @@ contract WrappedToken is ERC20 {
 pragma solidity ^0.8.20;
 
 interface IMessageHub {
-    function send_message(
+    function sendMessage(
         uint256 chainId,
         address target,
         bytes calldata data
@@ -79,7 +79,7 @@ contract TokenBridge {
         );
 
         // 3. Send cross-chain message
-        uint256 messageId = hub.send_message{value: msg.value}(
+        uint256 messageId = hub.sendMessage{value: msg.value}(
             BASE_SEPOLIA,
             wrappedTokenOnBase,
             data
@@ -93,17 +93,16 @@ contract TokenBridge {
 ## SDK Usage
 
 ```typescript
-import { ArbiLink }           from '@arbilink/sdk';
-import { encodeFunctionData } from 'viem';
-import { parseUnits }         from 'ethers';
+import { ArbiLink, encodeCall } from '@arbilink/sdk';
+import { parseUnits }           from 'ethers';
 
 const WRAPPED_USDC_ON_BASE = '0xYourWrappedUSDCAddress';
 const BASE_SEPOLIA         = 84532;
 const AMOUNT               = parseUnits('100', 6); // 100 USDC
 
 async function bridgeTokens(arbiLink: ArbiLink, recipient: string) {
-  const data = encodeFunctionData({
-    abi: [{
+  const data = encodeCall({
+    abi:          [{
       name:   'mintCrossChain',
       type:   'function',
       inputs: [
@@ -112,12 +111,12 @@ async function bridgeTokens(arbiLink: ArbiLink, recipient: string) {
       ],
     }],
     functionName: 'mintCrossChain',
-    args: [recipient as `0x${string}`, AMOUNT],
+    args:         [recipient, AMOUNT],
   });
 
   const messageId = await arbiLink.sendMessage({
-    chainId: BASE_SEPOLIA,
-    target:  WRAPPED_USDC_ON_BASE,
+    to:     BASE_SEPOLIA,
+    target: WRAPPED_USDC_ON_BASE,
     data,
   });
 

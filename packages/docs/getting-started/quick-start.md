@@ -44,14 +44,16 @@ console.log(`Fee: ${ethers.formatEther(fee)} ETH`);
 
 ## Step 3 — Encode your function call
 
+Use the SDK's `encodeCall` helper:
+
 ```typescript
-import { encodeFunctionData } from 'viem';
+import { encodeCall } from '@arbilink/sdk';
 
 // Example: call `store(uint256)` on a SimpleStorage contract
-const data = encodeFunctionData({
-  abi: [{ name: 'store', type: 'function', inputs: [{ type: 'uint256' }] }],
+const data = encodeCall({
+  abi:          [{ name: 'store', type: 'function', inputs: [{ type: 'uint256' }] }],
   functionName: 'store',
-  args: [42n],
+  args:         [42n],
 });
 ```
 
@@ -91,7 +93,7 @@ const unsubscribe = arbiLink.watchMessage(messageId, (msg) => {
 ```typescript
 import { ArbiLink }                from '@arbilink/sdk';
 import { ethers }                  from 'ethers';
-import { encodeFunctionData }      from 'viem';
+import { encodeCall }               from '@arbilink/sdk';
 
 async function sendCrossChainMessage() {
   // 1. Setup
@@ -100,20 +102,19 @@ async function sendCrossChainMessage() {
   const arbiLink = new ArbiLink(signer);
 
   // 2. Prepare
-  const chainId = 11155111; // Ethereum Sepolia
   const target  = '0x742d35Cc6634C0532925a3b844BC454e4438f44e';
-  const data    = encodeFunctionData({
-    abi: [{ name: 'execute', type: 'function', inputs: [] }],
+  const data    = encodeCall({
+    abi:          [{ name: 'execute', type: 'function', inputs: [] }],
     functionName: 'execute',
-    args: [],
+    args:         [],
   });
 
   // 3. Check fee
-  const fee = await arbiLink.calculateFee(chainId);
+  const fee = await arbiLink.calculateFee(11155111);
   console.log(`Sending for ${ethers.formatEther(fee)} ETH`);
 
   // 4. Send
-  const messageId = await arbiLink.sendMessage({ to: chainId, target, data });
+  const messageId = await arbiLink.sendMessage({ to: 11155111, target, data });
   console.log(`Sent → message #${messageId}`);
 
   // 5. Watch

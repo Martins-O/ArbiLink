@@ -51,9 +51,8 @@ Check `/api/contracts` for the deployed `ArbiLinkReceiver` address on each chain
 ## Part 2 — Send the Message
 
 ```typescript
-import { ArbiLink }           from '@arbilink/sdk';
-import { ethers }             from 'ethers';
-import { encodeFunctionData } from 'viem';
+import { ArbiLink, encodeCall } from '@arbilink/sdk';
+import { ethers }               from 'ethers';
 
 // Connect to Arbitrum Sepolia
 const provider = new ethers.JsonRpcProvider('https://sepolia-rollup.arbitrum.io/rpc');
@@ -64,15 +63,15 @@ const SIMPLE_STORAGE_ADDRESS = '0xYourSimpleStorageAddress';
 const NEW_VALUE              = 12345n;
 
 // Encode the function call
-const data = encodeFunctionData({
-  abi: [{
+const data = encodeCall({
+  abi:          [{
     name:    'setValue',
     type:    'function',
     inputs:  [{ name: '_value', type: 'uint256' }],
     outputs: [],
   }],
   functionName: 'setValue',
-  args: [NEW_VALUE],
+  args:         [NEW_VALUE],
 });
 
 // Send cross-chain message

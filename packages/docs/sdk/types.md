@@ -4,6 +4,39 @@ All TypeScript types exported from `@arbilink/sdk`.
 
 ---
 
+## `ChainId`
+
+```typescript
+type ChainId = 11155111 | 84532 | 80002 | 11155420;
+```
+
+---
+
+## `ChainName`
+
+```typescript
+type ChainName = 'ethereum' | 'base' | 'polygon' | 'optimism';
+```
+
+---
+
+## `ChainConfig`
+
+Configuration for a supported chain.
+
+```typescript
+interface ChainConfig {
+  id: number;
+  name: string;              // e.g. 'Ethereum Sepolia'
+  shortName: ChainName;      // e.g. 'ethereum'
+  rpc: string;               // Public RPC endpoint
+  explorer: string;          // Block explorer URL
+  receiverAddress: string;   // ArbiLinkReceiver address on this chain
+}
+```
+
+---
+
 ## `MessageStatus`
 
 ```typescript
@@ -25,30 +58,30 @@ Full message object returned by `getMessageStatus` and `watchMessage`.
 
 ```typescript
 interface Message {
-  id:          bigint;
-  sender:      string;        // Address that called sendMessage()
-  destination: number;        // Destination chain ID
-  target:      string;        // Target contract address
-  data:        string;        // ABI-encoded call data
-  value:       bigint;        // ETH value sent with message (usually 0)
-  fee:         bigint;        // Fee paid to the relayer (in wei)
-  timestamp:   bigint;        // Block timestamp when sent
-  relayer:     string;        // Relayer address (ZeroAddress if pending)
-  status:      MessageStatus;
+  id: bigint;
+  status: MessageStatus;
+  sender?: string;            // Address that called sendMessage()
+  destinationChain?: number;  // Destination chain ID
+  target?: string;            // Target contract address on destination chain
+  data?: string;              // ABI-encoded call data
+  feePaid?: bigint;           // Protocol fee paid (in wei)
+  relayer?: string;           // Relayer address (present once relayed/confirmed)
 }
 ```
+
+Fields are populated from on-chain events. Recent messages have all fields; older archived messages may have partial data.
 
 ### Example
 
 ```typescript
 const msg = await arbiLink.getMessageStatus(1n);
 
-console.log(msg.id);          // 1n
-console.log(msg.sender);      // '0xabc...'
-console.log(msg.destination); // 11155111
-console.log(msg.target);      // '0x742d...'
-console.log(msg.status);      // 'confirmed'
-console.log(msg.relayer);     // '0xdef...'
+console.log(msg.id);                // 1n
+console.log(msg.sender);            // '0xabc...'
+console.log(msg.destinationChain);  // 11155111
+console.log(msg.target);            // '0x742d...'
+console.log(msg.status);            // 'confirmed'
+console.log(msg.relayer);           // '0xdef...'
 ```
 
 ---
@@ -59,24 +92,34 @@ Parameters for `arbiLink.sendMessage()`.
 
 ```typescript
 interface SendMessageParams {
-  chainId: number;   // Destination chain ID
-  target:  string;   // Target contract address on destination chain
-  data:    string;   // ABI-encoded function call (use encodeFunctionData from viem)
+  to: number | ChainName;  // Destination chain — numeric ID or short name ('ethereum', 'base', 'polygon', 'optimism')
+  target: string;          // Target contract address on the destination chain
+  data: string;            // ABI-encoded function call (use encodeCall() helper)
+  fee?: bigint;            // Override the auto-calculated fee (wei). Fetched from hub if omitted.
 }
 ```
 
 ---
 
-## `ChainConfig`
-
-Configuration for a registered destination chain, returned by `getChainInfo()`.
+## `WatchOptions`
 
 ```typescript
-interface ChainConfig {
-  chainId:  number;   // EVM chain ID
-  receiver: string;   // ArbiLinkReceiver address on this chain
-  fee:      bigint;   // Base fee in wei
-  active:   boolean;  // Whether this chain is accepting messages
+interface WatchOptions {
+  pollIntervalMs?: number;  // Poll interval in ms when WebSocket is unavailable (default: 3000)
+}
+```
+
+---
+
+## `RelayerInfo`
+
+Relayer status and statistics, returned by `getRelayerInfo()`.
+
+```typescript
+interface RelayerInfo {
+  active: boolean;
+  stake: bigint;
+  successfulDeliveries: bigint;
 }
 ```
 
@@ -88,13 +131,25 @@ Custom error class thrown by the SDK.
 
 ```typescript
 class ArbiLinkError extends Error {
-  code:    string;           // Machine-readable error code
-  details: string | null;    // Human-readable detail message
-  cause:   unknown | null;   // Underlying error (if any)
+  message: string;
+  cause?: unknown;         // Underlying error (contract revert, network error, etc.)
 }
 ```
 
-See [Errors](/sdk/errors) for all error codes and how to handle them.
+The SDK does not use error codes. Check the error message or `cause` for details:
+
+```typescript
+try {
+  await arbiLink.sendMessage({ ... });
+} catch (err) {
+  if (err instanceof ArbiLinkError) {
+    console.error(err.message);       // Human-readable description
+    console.error(err.cause);         // Raw error (contract revert, etc.)
+  }
+}
+```
+
+See [Errors](/sdk/errors) for common error scenarios.
 
 ---
 
@@ -104,17 +159,23 @@ See [Errors](/sdk/errors) for all error codes and how to handle them.
 /** Chain ID of the MessageHub (Arbitrum Sepolia) */
 const ARBITRUM_SEPOLIA_CHAIN_ID: number;   // 421614
 
+/** Default RPC for Arbitrum Sepolia */
+const ARBITRUM_SEPOLIA_RPC: string;        // 'https://sepolia-rollup.arbitrum.io/rpc'
+
 /** All chains the SDK knows about */
 const SUPPORTED_CHAINS: ChainConfig[];
 
 /** Map of chain name → chain ID */
-const CHAIN_IDS: Record<string, number>;
+const CHAIN_IDS: Record<ChainName, number>;
 
 /** MessageHub contract address on Arbitrum Sepolia */
 const MESSAGE_HUB_ADDRESS: string;
 
 /** ArbiLinkReceiver address on each destination chain */
 const RECEIVER_ADDRESSES: Record<number, string>;
+
+/** Default challenge period in seconds (matches hub deployment param) */
+const DEFAULT_CHALLENGE_PERIOD_SECS: number;  // 300
 ```
 
 ### Example
@@ -128,5 +189,5 @@ import {
 
 console.log(ARBITRUM_SEPOLIA_CHAIN_ID);           // 421614
 console.log(CHAIN_IDS.ethereum);                   // 11155111
-console.log(RECEIVER_ADDRESSES[11155111]);         // '0x...'
+console.log(RECEIVER_ADDRESSES[11155111]);         // '0x8950...'
 ```

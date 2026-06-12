@@ -58,9 +58,8 @@ forge create CrossChainNFT \
 ## 3 — Send the Mint Message from Arbitrum
 
 ```typescript
-import { ArbiLink }           from '@arbilink/sdk';
-import { encodeFunctionData } from 'viem';
-import { ethers }             from 'ethers';
+import { ArbiLink, encodeCall } from '@arbilink/sdk';
+import { ethers }               from 'ethers';
 
 const CROSS_CHAIN_NFT = '0xYourNFTAddress';
 const ETHEREUM_SEPOLIA = 11155111;
@@ -69,8 +68,8 @@ async function mintNFTOnEthereum(
   arbiLink: ArbiLink,
   recipient: string,
 ) {
-  const data = encodeFunctionData({
-    abi: [{
+  const data = encodeCall({
+    abi:          [{
       name:    'mintCrossChain',
       type:    'function',
       inputs:  [
@@ -79,12 +78,12 @@ async function mintNFTOnEthereum(
       ],
     }],
     functionName: 'mintCrossChain',
-    args: [recipient as `0x${string}`, BigInt(421614)],
+    args:         [recipient, 421614n],
   });
 
   const messageId = await arbiLink.sendMessage({
-    chainId: ETHEREUM_SEPOLIA,
-    target:  CROSS_CHAIN_NFT,
+    to:     ETHEREUM_SEPOLIA,
+    target: CROSS_CHAIN_NFT,
     data,
   });
 

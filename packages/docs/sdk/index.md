@@ -16,10 +16,14 @@ export { ArbiLink } from '@arbilink/sdk';
 
 // Types
 export type {
-  SendMessageParams,
+  ChainId,
+  ChainName,
+  ChainConfig,
   Message,
   MessageStatus,
-  ChainConfig,
+  RelayerInfo,
+  SendMessageParams,
+  WatchOptions,
 } from '@arbilink/sdk';
 
 // Errors
@@ -28,10 +32,12 @@ export { ArbiLinkError } from '@arbilink/sdk';
 // Constants
 export {
   ARBITRUM_SEPOLIA_CHAIN_ID,
+  ARBITRUM_SEPOLIA_RPC,
   SUPPORTED_CHAINS,
   CHAIN_IDS,
   MESSAGE_HUB_ADDRESS,
   RECEIVER_ADDRESSES,
+  DEFAULT_CHALLENGE_PERIOD_SECS,
 } from '@arbilink/sdk';
 
 // Utilities
@@ -42,7 +48,12 @@ export {
   statusLabel,
   resolveChainId,
   estimateDeliveryTime,
+  parseStatusCode,
 } from '@arbilink/sdk';
+
+// ABIs (useful for integrators building their own wrappers)
+export { default as MessageHubABI } from '@arbilink/sdk/abi/MessageHub.json';
+export { default as ReceiverABI }   from '@arbilink/sdk/abi/Receiver.json';
 ```
 
 ## Quick Reference
@@ -55,10 +66,15 @@ export {
 | `calculateFee(chainId)` | Get the fee to send to a chain |
 | `watchMessage(id, cb)` | Subscribe to message status updates |
 | `messageCount()` | Total messages sent through the hub |
+| `owner()` | Hub owner address |
+| `minStake()` | Minimum relayer stake |
+| `challengePeriod()` | Challenge window in seconds |
 | `getChainInfo(chainId)` | Get registered chain configuration |
+| `getRelayerInfo(address)` | Fetch relayer details (stake, deliveries) |
 | `isActiveRelayer(address)` | Check if an address is a staked relayer |
 | `registerRelayer(stake?)` | Register as a relayer |
 | `exitRelayer()` | Deregister and withdraw stake |
+| `withdrawProtocolFees()` | Withdraw protocol fees (owner only) |
 
 ## Supported Chains
 
@@ -67,6 +83,7 @@ export {
 | Arbitrum Sepolia (hub) | 421614 | Hub |
 | Ethereum Sepolia | 11155111 | Supported |
 | Base Sepolia | 84532 | Supported |
+| Polygon Amoy | 80002 | Supported |
 
 ## Design Philosophy
 

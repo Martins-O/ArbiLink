@@ -16,9 +16,10 @@ async sendMessage(params: SendMessageParams): Promise<bigint>
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `chainId` | `number` | Yes | Destination chain ID |
+| `to` | `number \| ChainName` | Yes | Destination chain ID or short name (`'ethereum'`, `'base'`, `'polygon'`, `'optimism'`) |
 | `target` | `string` | Yes | Contract address on the destination chain |
-| `data` | `string` | Yes | ABI-encoded function call data |
+| `data` | `string` | Yes | ABI-encoded function call data (use `encodeCall()`) |
+| `fee` | `bigint` | No | Override the auto-calculated fee — fetched from hub if omitted |
 
 ### Returns
 
@@ -27,34 +28,18 @@ async sendMessage(params: SendMessageParams): Promise<bigint>
 ### Example
 
 ```typescript
-import { encodeFunctionData } from 'viem';
-
-const data = encodeFunctionData({
-  abi:         nftAbi,
-  functionName: 'mint',
-  args:        [recipient, tokenId],
-});
-
 const messageId = await arbiLink.sendMessage({
-  chainId: 11155111,
-  target:  NFT_CONTRACT,
-  data,
+  to:     'ethereum',
+  target: NFT_CONTRACT,
+  data:   encodeCall({
+    abi:          nftAbi,
+    functionName: 'mint',
+    args:         [recipient, tokenId],
+  }),
 });
 
 console.log(`Message ID: ${messageId}`);
 ```
-
-### Errors
-
-| Error | Cause |
-|-------|-------|
-| `NOT_CONNECTED` | Called with a Provider instead of Signer |
-| `ChainNotSupported` | `chainId` not registered in MessageHub |
-| `InsufficientFee` | The transaction `value` was below the required fee |
-
-::: tip Fee calculation
-The fee is calculated automatically from `calculateFee()`. You do not need to pass it manually — the SDK handles this internally.
-:::
 
 ---
 
@@ -81,10 +66,10 @@ async getMessageStatus(messageId: bigint): Promise<Message>
 ```typescript
 const msg = await arbiLink.getMessageStatus(42n);
 
-console.log(msg.status);      // 'pending' | 'relayed' | 'confirmed' | 'failed'
-console.log(msg.sender);      // '0xabc...'
-console.log(msg.destination); // 11155111
-console.log(msg.relayer);     // '0xdef...' or ZeroAddress if not yet relayed
+console.log(msg.status);            // 'pending' | 'relayed' | 'confirmed' | 'failed'
+console.log(msg.sender);            // '0xabc...'
+console.log(msg.destinationChain);  // 11155111
+console.log(msg.relayer);           // '0xdef...' or undefined if not yet relayed
 ```
 
 ---
@@ -104,7 +89,7 @@ import { formatEther } from 'ethers';
 
 const fee = await arbiLink.calculateFee(11155111);
 console.log(`Fee: ${formatEther(fee)} ETH`);
-// → Fee: 0.0001 ETH (~$0.23)
+// → Fee: 0.0001 ETH
 ```
 
 ---
@@ -116,7 +101,8 @@ Subscribe to real-time status updates for a message.
 ```typescript
 watchMessage(
   messageId: bigint,
-  callback: (message: Message) => void
+  callback: (message: Message) => void,
+  options?: WatchOptions,
 ): () => void
 ```
 
@@ -126,6 +112,7 @@ watchMessage(
 |-----------|------|-------------|
 | `messageId` | `bigint` | The message ID to watch |
 | `callback` | `(message: Message) => void` | Called on every status change |
+| `options` | `WatchOptions` | *(optional)* `pollIntervalMs` for WebSocket fallback |
 
 ### Returns
 
@@ -146,10 +133,6 @@ const unsubscribe = arbiLink.watchMessage(messageId, (msg) => {
 setTimeout(unsubscribe, 60_000);
 ```
 
-::: tip Polling interval
-`watchMessage` polls `getMessageStatus` every **3 seconds**. For lower latency, use `getMessageStatus` directly in a tighter loop.
-:::
-
 ---
 
 ## `messageCount()`
@@ -169,25 +152,88 @@ console.log(`Total messages: ${total}`);
 
 ---
 
+## `owner()`
+
+Get the hub owner address.
+
+```typescript
+async owner(): Promise<string>
+```
+
+### Example
+
+```typescript
+const owner = await arbiLink.owner();
+console.log(`Hub owner: ${owner}`);
+```
+
+---
+
+## `minStake()`
+
+Get the minimum stake (wei) required to register as a relayer.
+
+```typescript
+async minStake(): Promise<bigint>
+```
+
+### Example
+
+```typescript
+const stake = await arbiLink.minStake();
+console.log(`Min stake: ${formatEther(stake)} ETH`);
+```
+
+---
+
+## `challengePeriod()`
+
+Get the current challenge period in seconds.
+
+```typescript
+async challengePeriod(): Promise<bigint>
+```
+
+### Example
+
+```typescript
+const period = await arbiLink.challengePeriod();
+console.log(`Challenge window: ${period}s`);
+```
+
+---
+
 ## `getChainInfo(chainId)`
 
 Get configuration for a registered destination chain.
 
 ```typescript
-async getChainInfo(chainId: number): Promise<ChainConfig | null>
+async getChainInfo(chainId: number): Promise<...>
 ```
 
-### Returns
-
-`ChainConfig | null` — `null` if the chain is not registered.
+### Example
 
 ```typescript
 const info = await arbiLink.getChainInfo(11155111);
-if (info) {
-  console.log(info.receiver);  // ArbiLinkReceiver address on that chain
-  console.log(info.fee);       // Base fee in wei
-  console.log(info.active);    // Whether the chain is accepting messages
-}
+```
+
+---
+
+## `getRelayerInfo(address)`
+
+Fetch relayer details including stake and delivery count.
+
+```typescript
+async getRelayerInfo(address: string): Promise<RelayerInfo>
+```
+
+### Example
+
+```typescript
+const info = await arbiLink.getRelayerInfo('0xabc...');
+console.log(info.active);               // boolean
+console.log(info.stake);                // bigint (wei)
+console.log(info.successfulDeliveries); // bigint
 ```
 
 ---
@@ -217,22 +263,18 @@ Register the signer as a relayer by staking ETH.
 async registerRelayer(stakeOverride?: bigint): Promise<void>
 ```
 
-::: warning Signer required
-This method requires a Signer (not a Provider).
-:::
-
 ### Parameters
 
 | Parameter | Type | Required | Default |
 |-----------|------|----------|---------|
-| `stakeOverride` | `bigint` | No | `RELAYER_STAKE` constant (0.1 ETH) |
+| `stakeOverride` | `bigint` | No | Fetched from hub (`minStake()`) |
 
 ### Example
 
 ```typescript
 import { parseEther } from 'ethers';
 
-// Register with the default stake (0.1 ETH)
+// Register with the minimum stake
 await arbiLink.registerRelayer();
 
 // Register with a custom stake
@@ -249,13 +291,25 @@ Deregister as a relayer and withdraw stake.
 async exitRelayer(): Promise<void>
 ```
 
-::: warning Cooldown period
-There is a cooldown before stake is returned. Check `getChainInfo` for the current cooldown duration.
-:::
-
 ### Example
 
 ```typescript
 await arbiLink.exitRelayer();
-console.log('Deregistered — stake will be returned after cooldown.');
+console.log('Deregistered — stake returned.');
+```
+
+---
+
+## `withdrawProtocolFees()`
+
+Withdraw accumulated protocol fees. Only callable by the hub owner.
+
+```typescript
+async withdrawProtocolFees(): Promise<void>
+```
+
+### Example
+
+```typescript
+await arbiLink.withdrawProtocolFees();
 ```
