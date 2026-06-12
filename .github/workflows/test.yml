@@ -57,6 +57,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
       - name: Install forge-std
         run: |
           mkdir -p lib
