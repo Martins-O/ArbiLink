@@ -41,10 +41,4 @@ library ECDSA {
         return signer;
     }
 
-    /**
-     * @dev Returns the eth_sign prefixed message hash.
-     */
-    function toEthSignedMessageHash(bytes32 hash) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash));
-    }
 }

@@ -259,19 +259,82 @@ contract ArbiLinkReceiverTest is Test {
         receiver.setHubSigningKey(address(0x9999));
     }
 
-    // ── 16. transferOwnership ────────────────────────────────────────────────
+    // ── 16. setMessageHub updates hub ───────────────────────────────────────
 
-    function test_TransferOwnership() public {
+    function test_SetMessageHub() public {
+        address newHub = address(0xAAAA);
+        receiver.setMessageHub(newHub);
+        assertEq(receiver.messageHub(), newHub);
+    }
+
+    // ── 17. Non-owner cannot setMessageHub ──────────────────────────────────
+
+    function test_SetMessageHub_NonOwnerReverts() public {
+        vm.prank(address(0x2222));
+        vm.expectRevert(ArbiLinkReceiver.Unauthorized.selector);
+        receiver.setMessageHub(address(0xAAAA));
+    }
+
+    // ── 18. transferOwnership ────────────────────────────────────────────────
+
+    function test_TransferOwnership_TwoStep() public {
         address newOwner = address(0x3333);
         receiver.transferOwnership(newOwner);
-        assertEq(receiver.owner(), newOwner);
+        assertEq(receiver.owner(), address(this));
+        assertEq(receiver.pendingOwner(), newOwner);
 
-        // old owner can no longer administer
+        // old owner can still administer until acceptance
+        receiver.setRelayer(address(0xAAAA), true);
+        assertTrue(receiver.authorizedRelayers(address(0xAAAA)));
+    }
+
+    // ── 19. acceptOwnership completes two-step transfer ─────────────────────
+
+    function test_AcceptOwnership() public {
+        address newOwner = address(0x3333);
+        receiver.transferOwnership(newOwner);
+        vm.prank(newOwner);
+        receiver.acceptOwnership();
+        assertEq(receiver.owner(), newOwner);
+        assertEq(receiver.pendingOwner(), address(0));
+
+        // new owner can administer
+        vm.prank(newOwner);
+        receiver.setRelayer(address(0xBBBB), true);
+        assertTrue(receiver.authorizedRelayers(address(0xBBBB)));
+    }
+
+    // ── 20. Non-pending cannot acceptOwnership ────────────────────────────
+
+    function test_AcceptOwnership_NonPendingReverts() public {
+        address newOwner = address(0x3333);
+        receiver.transferOwnership(newOwner);
+        vm.prank(address(0x9999));
+        vm.expectRevert(ArbiLinkReceiver.Unauthorized.selector);
+        receiver.acceptOwnership();
+    }
+
+    // ── 21. After acceptance, old owner cannot administer ────────────────
+
+    function test_OldOwnerLosesAccessAfterAcceptance() public {
+        address newOwner = address(0x3333);
+        receiver.transferOwnership(newOwner);
+        vm.prank(newOwner);
+        receiver.acceptOwnership();
+
         vm.expectRevert(ArbiLinkReceiver.Unauthorized.selector);
         receiver.setRelayer(address(0xAAAA), true);
     }
 
-    // ── 17. nonExecutionProofPayload ─────────────────────────────────────────
+    // ── 22. Non-owner cannot transferOwnership ───────────────────────────
+
+    function test_TransferOwnership_NonOwnerReverts() public {
+        vm.prank(address(0x9999));
+        vm.expectRevert(ArbiLinkReceiver.Unauthorized.selector);
+        receiver.transferOwnership(address(0xAAAA));
+    }
+
+    // ── 23. nonExecutionProofPayload ─────────────────────────────────────────
 
     function test_NonExecutionProofPayload() public view {
         bytes32 p = receiver.nonExecutionProofPayload(42, 421614);
@@ -279,7 +342,100 @@ contract ArbiLinkReceiverTest is Test {
         assertEq(p, expected);
     }
 
-    // ── 18. Multiple distinct messages are all accepted ──────────────────────
+    // ── 24. Pause blocks receiveMessage ────────────────────────────────────
+
+    function test_Pause_BlocksReceiveMessage() public {
+        receiver.pause();
+        ArbiLinkReceiver.Message memory m = _makeMessage(200, address(target), "");
+        bytes memory proof = _validProof(m);
+        vm.expectRevert(ArbiLinkReceiver.ContractPaused.selector);
+        receiver.receiveMessage(m, proof);
+    }
+
+    // ── 25. Unpause resumes receiveMessage ─────────────────────────────────
+
+    function test_Unpause_ResumesReceiveMessage() public {
+        receiver.pause();
+        receiver.unpause();
+        ArbiLinkReceiver.Message memory m = _makeMessage(201, address(target), abi.encodeCall(MockTarget.increment, ()));
+        bytes memory proof = _validProof(m);
+        bool ok = receiver.receiveMessage(m, proof);
+        assertTrue(ok);
+    }
+
+    // ── 26. Non-owner cannot pause ─────────────────────────────────────────
+
+    function test_Pause_NonOwnerReverts() public {
+        vm.prank(address(0x9999));
+        vm.expectRevert(ArbiLinkReceiver.Unauthorized.selector);
+        receiver.pause();
+    }
+
+    // ── 27. Fuzz: proofPayload always matches keccak256(abi.encode(m)) ────────────
+
+    function testFuzz_proofPayload(
+        uint256 id,
+        address targetAddr,
+        bytes calldata data,
+        uint32  sourceChain
+    ) public view {
+        targetAddr = address(uint160(uint256(keccak256(abi.encode(targetAddr)))));
+        vm.assume(targetAddr != address(0));
+        ArbiLinkReceiver.Message memory m = _makeMessage(id, targetAddr, data);
+        // Override sourceChain if different from default 421614
+        if (sourceChain != 421614) {
+            m.sourceChain = sourceChain;
+        }
+        bytes32 expected = keccak256(abi.encode(m));
+        assertEq(receiver.proofPayload(m), expected);
+    }
+
+    // ── 28. Fuzz: wrong-key signatures are rejected ─────────────────────────
+
+    function testFuzz_RandomInvalidProof(uint256 id, uint256 wrongKey) public {
+        // Bound to valid Secp256k1 range and avoid colliding with the test signing key
+        wrongKey = bound(wrongKey, 1, 0xBEEF - 1);
+        ArbiLinkReceiver.Message memory m = _makeMessage(id, address(0xCAFE), "");
+        bytes32 msgHash = keccak256(abi.encode(m));
+        bytes32 ethHash = keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", msgHash));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(wrongKey, ethHash);
+        bytes memory proof = abi.encodePacked(r, s, v);
+        vm.expectRevert(ArbiLinkReceiver.InvalidSignature.selector);
+        receiver.receiveMessage(m, proof);
+    }
+
+    // ── 29. Fuzz: random malformed proof lengths are rejected ───────────────
+
+    function testFuzz_InvalidProofLength(uint256 id, uint8 length) public {
+        length = uint8(bound(uint256(length), 0, 128));
+        vm.assume(length != 65);
+        bytes memory proof = new bytes(length);
+        ArbiLinkReceiver.Message memory m = _makeMessage(id, address(0xCAFE), "");
+        vm.expectRevert(ArbiLinkReceiver.InvalidSignature.selector);
+        receiver.receiveMessage(m, proof);
+    }
+
+    // ── 30. Fuzz: valid random messages all succeed ─────────────────────────
+
+    function testFuzz_ReceiveMessage(
+        uint256 id,
+        address targetAddr,
+        bytes calldata data
+    ) public {
+        targetAddr = address(uint160(uint256(keccak256(abi.encode(targetAddr)))));
+        vm.assume(targetAddr != address(0));
+        vm.assume(data.length <= 256); // avoid absurdly long calldata
+
+        ArbiLinkReceiver.Message memory m = _makeMessage(id, targetAddr, data);
+        bytes memory proof = _validProof(m);
+
+        receiver.receiveMessage(m, proof);
+        // The target address is random — it'll either succeed (EOA) or revert.
+        // We just verify no exception is thrown and the message is processed.
+        assertTrue(receiver.isProcessed(m));
+    }
+
+    // ── 31. Multiple distinct messages are all accepted ──────────────────────
 
     function test_MultipleDistinctMessages() public {
         for (uint256 i = 1; i <= 5; i++) {

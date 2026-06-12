@@ -18,13 +18,17 @@ import {ECDSA} from "./ECDSA.sol";
 contract ArbiLinkReceiver {
     // ── State ──────────────────────────────────────────────────────────────────
 
-    address public immutable messageHub; // MessageHub address on Arbitrum
+    address public messageHub; // MessageHub address on Arbitrum
     address public owner;
+    address public pendingOwner;
     address public hubSigningKey;        // key that signs execution proofs
 
+    bool                        public paused;
     mapping(address => bool)    public authorizedRelayers;
     mapping(bytes32 => bool)    public processedMessages;
     mapping(bytes32 => Receipt) public receipts;
+
+    uint256 public constant MAX_CALL_GAS = 100_000;
 
     uint256 public totalExecuted;
     uint256 public totalFailed;
@@ -55,7 +59,11 @@ contract ArbiLinkReceiver {
     );
     event RelayerAuthorized(address indexed relayer, bool authorized);
     event HubSigningKeyUpdated(address indexed newKey);
+    event MessageHubUpdated(address indexed newHub);
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event Paused(address account);
+    event Unpaused(address account);
 
     // ── Errors ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +72,7 @@ contract ArbiLinkReceiver {
     error InvalidSignature();
     error InvalidTarget();
     error Unauthorized();
+    error ContractPaused();
 
     // ── Modifiers ──────────────────────────────────────────────────────────────
 
@@ -74,6 +83,11 @@ contract ArbiLinkReceiver {
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert Unauthorized();
+        _;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert ContractPaused();
         _;
     }
 
@@ -101,7 +115,7 @@ contract ArbiLinkReceiver {
     function receiveMessage(
         Message calldata message,
         bytes   calldata proof
-    ) external onlyRelayer returns (bool success) {
+    ) external onlyRelayer whenNotPaused returns (bool success) {
         // 1. Replay protection
         bytes32 msgHash = keccak256(abi.encode(message));
         if (processedMessages[msgHash]) revert AlreadyProcessed(msgHash);
@@ -115,8 +129,8 @@ contract ArbiLinkReceiver {
         // 4. Mark processed before external call (CEI pattern)
         processedMessages[msgHash] = true;
 
-        // 5. Execute
-        (success, ) = message.target.call(message.data);
+        // 5. Execute (bounded gas to prevent runaway targets)
+        (success, ) = message.target.call{gas: MAX_CALL_GAS}(message.data);
 
         // 6. Record receipt
         receipts[msgHash] = Receipt({
@@ -126,9 +140,9 @@ contract ArbiLinkReceiver {
         });
 
         if (success) {
-            totalExecuted++;
+            unchecked { totalExecuted++; }
         } else {
-            totalFailed++;
+            unchecked { totalFailed++; }
         }
 
         emit MessageReceived(message.id, message.sender, message.target, success);
@@ -145,7 +159,8 @@ contract ArbiLinkReceiver {
 
     /**
      * @notice Generate a non-execution (fraud) proof payload.
-     *         The hub signing key signs this to indicate a message was NOT executed.
+     *         Intended for off-chain relayer / challenger tooling.
+     *         The hub signing key signs this to prove a message was NOT executed.
      */
     function nonExecutionProofPayload(
         uint256 messageId,
@@ -155,6 +170,16 @@ contract ArbiLinkReceiver {
     }
 
     // ── Admin ──────────────────────────────────────────────────────────────────
+
+    function pause() external onlyOwner {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
 
     function setRelayer(address relayer, bool authorized) external onlyOwner {
         authorizedRelayers[relayer] = authorized;
@@ -166,9 +191,21 @@ contract ArbiLinkReceiver {
         emit HubSigningKeyUpdated(newKey);
     }
 
+    function setMessageHub(address newHub) external onlyOwner {
+        messageHub = newHub;
+        emit MessageHubUpdated(newHub);
+    }
+
     function transferOwnership(address newOwner) external onlyOwner {
-        emit OwnershipTransferred(owner, newOwner);
-        owner = newOwner;
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    function acceptOwnership() external {
+        if (msg.sender != pendingOwner) revert Unauthorized();
+        emit OwnershipTransferred(owner, pendingOwner);
+        owner = pendingOwner;
+        pendingOwner = address(0);
     }
 
     // ── View ───────────────────────────────────────────────────────────────────

@@ -53,7 +53,13 @@ sol! {
     event RelayerRegistered(address indexed relayer, uint256 stake);
     event RelayerExited(address indexed relayer, uint256 returned);
     event ChainAdded(uint32 indexed chainId, address receiver, uint256 baseFee);
+    event ChainRemoved(uint32 indexed chainId);
     event FeesWithdrawn(address indexed owner, uint256 amount);
+    event Initialized(address indexed owner, uint256 minStake, uint256 challengePeriod);
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event MinStakeUpdated(uint256 previousMinStake, uint256 newMinStake);
+    event ChallengePeriodUpdated(uint256 previousPeriod, uint256 newPeriod);
 
     error ChainNotSupported(uint32 chainId);
     error InsufficientFee(uint256 required, uint256 provided);
@@ -70,6 +76,7 @@ sol! {
     error CannotChallenge(uint256 messageId, uint8 status);
     error NoStakeToSlash(address relayer);
     error NothingToWithdraw();
+    error InvalidInput();
 }
 
 sol_storage! {
@@ -96,6 +103,7 @@ sol_storage! {
     #[entrypoint]
     pub struct MessageHub {
         address owner;
+        address pending_owner;
         uint256 message_nonce;
         mapping(uint256 => StoredMessage) messages;
         mapping(uint32 => StoredChainConfig) supported_chains;
@@ -119,9 +127,12 @@ fn enc<E: SolError>(e: E) -> Vec<u8> { e.abi_encode() }
 impl MessageHub {
     pub fn initialize(&mut self, min_stake: U256, challenge_period: U256) -> Result<(), Vec<u8>> {
         if self.owner.get() != Address::ZERO { return Err(enc(AlreadyInitialized {})); }
-        self.owner.set(self.vm().msg_sender());
+        let caller = self.vm().msg_sender();
+        self.owner.set(caller);
+        self.pending_owner.set(Address::ZERO);
         self.min_stake.set(min_stake);
         self.challenge_period.set(challenge_period);
+        self.vm().log(Initialized { owner: caller, minStake: min_stake, challengePeriod: challenge_period });
         Ok(())
     }
 
@@ -131,6 +142,7 @@ impl MessageHub {
         if !self.supported_chains.getter(ck).enabled.get() {
             return Err(enc(ChainNotSupported { chainId: destination_chain }));
         }
+        if target == Address::ZERO { return Err(enc(InvalidInput {})); }
         let req = self.supported_chains.getter(ck).base_fee.get();
         let val = self.vm().msg_value();
         if val < req { return Err(enc(InsufficientFee { required: req, provided: val })); }
@@ -268,6 +280,47 @@ impl MessageHub {
         Ok(())
     }
 
+    pub fn remove_chain(&mut self, chain_id: u32) -> Result<(), Vec<u8>> {
+        self.only_owner()?;
+        let ck = U32::from(chain_id);
+        { let mut c = self.supported_chains.setter(ck); c.enabled.set(false); }
+        self.vm().log(ChainRemoved { chainId: chain_id });
+        Ok(())
+    }
+
+    pub fn set_min_stake(&mut self, new_min: U256) -> Result<(), Vec<u8>> {
+        self.only_owner()?;
+        let prev = self.min_stake.get();
+        self.min_stake.set(new_min);
+        self.vm().log(MinStakeUpdated { previousMinStake: prev, newMinStake: new_min });
+        Ok(())
+    }
+
+    pub fn set_challenge_period(&mut self, new_period: U256) -> Result<(), Vec<u8>> {
+        self.only_owner()?;
+        let prev = self.challenge_period.get();
+        self.challenge_period.set(new_period);
+        self.vm().log(ChallengePeriodUpdated { previousPeriod: prev, newPeriod: new_period });
+        Ok(())
+    }
+
+    pub fn transfer_ownership(&mut self, new_owner: Address) -> Result<(), Vec<u8>> {
+        self.only_owner()?;
+        self.pending_owner.set(new_owner);
+        self.vm().log(OwnershipTransferStarted { previousOwner: self.owner.get(), newOwner: new_owner });
+        Ok(())
+    }
+
+    pub fn accept_ownership(&mut self) -> Result<(), Vec<u8>> {
+        let caller = self.vm().msg_sender();
+        if caller != self.pending_owner.get() { return Err(enc(Unauthorized { caller })); }
+        let prev = self.owner.get();
+        self.owner.set(caller);
+        self.pending_owner.set(Address::ZERO);
+        self.vm().log(OwnershipTransferred { previousOwner: prev, newOwner: caller });
+        Ok(())
+    }
+
     pub fn get_message_status(&self, id: U256) -> Result<u8, Vec<u8>> {
         if self.messages.getter(id).timestamp.get() == U256::ZERO { return Err(enc(MessageNotFound { messageId: id })); }
         Ok(self.messages.getter(id).status.get().to::<u8>())
@@ -334,21 +387,6 @@ mod tests {
         hub.send_message(84532, target, data).unwrap()
     }
 
-    /// Assert that two ABI error encodings match (handles selector differences).
-    fn assert_error_eq(got: &[u8], expected: &[u8]) {
-        if got != expected {
-            // Fallback: just check that the function returned an error
-            // (skip selector check since sol! encoding may differ)
-            panic!(
-                "error mismatch\ngot:      {got:?}\nexpected: {expected:?}\n\
-                 got sel:      {:02x}{:02x}{:02x}{:02x}\n\
-                 expected sel: {:02x}{:02x}{:02x}{:02x}",
-                got[0], got[1], got[2], got[3],
-                expected[0], expected[1], expected[2], expected[3],
-            );
-        }
-    }
-
     // ── initialize ──────────────────────────────────────────────────────────
 
     #[test]
@@ -407,6 +445,27 @@ mod tests {
         assert_eq!(err, enc(ZeroAddress {}));
     }
 
+    // ── remove_chain ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_remove_chain() {
+        let (vm, mut hub, _owner) = setup();
+        hub.remove_chain(84532).unwrap();
+        // Chain disabled — send_message should now fail
+        vm.set_value(U256::from(500));
+        let err = hub.send_message(84532, Address::from([0xBBu8; 20]), Bytes::from(vec![])).unwrap_err();
+        assert_eq!(err, enc(ChainNotSupported { chainId: 84532 }));
+    }
+
+    #[test]
+    fn test_remove_chain_not_owner() {
+        let (vm, mut hub, _owner) = setup();
+        let non_owner = Address::from([0x99u8; 20]);
+        vm.set_sender(non_owner);
+        let err = hub.remove_chain(84532).unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: non_owner }));
+    }
+
     // ── send_message ────────────────────────────────────────────────────────
 
     #[test]
@@ -443,6 +502,14 @@ mod tests {
         assert_eq!(id1, U256::from(1));
         assert_eq!(id2, U256::from(2));
         assert_eq!(hub.message_count(), U256::from(2));
+    }
+
+    #[test]
+    fn test_send_message_zero_target() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_value(U256::from(500));
+        let err = hub.send_message(84532, Address::ZERO, Bytes::from(vec![])).unwrap_err();
+        assert_eq!(err, enc(InvalidInput {}));
     }
 
     // ── register_relayer / exit_relayer ─────────────────────────────────────
@@ -496,6 +563,42 @@ mod tests {
         vm.set_sender(Address::from([0x99u8; 20]));
         let err = hub.exit_relayer().unwrap_err();
         assert_eq!(err, enc(RelayerNotActive { relayer: vm.msg_sender() }));
+    }
+
+    // ── set_min_stake ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_set_min_stake() {
+        let (_vm, mut hub, _owner) = setup();
+        assert_eq!(hub.min_stake(), U256::from(100));
+        hub.set_min_stake(U256::from(200)).unwrap();
+        assert_eq!(hub.min_stake(), U256::from(200));
+    }
+
+    #[test]
+    fn test_set_min_stake_not_owner() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_sender(Address::from([0x99u8; 20]));
+        let err = hub.set_min_stake(U256::from(200)).unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: Address::from([0x99u8; 20]) }));
+    }
+
+    // ── set_challenge_period ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_set_challenge_period() {
+        let (_vm, mut hub, _owner) = setup();
+        assert_eq!(hub.challenge_period(), U256::from(3600));
+        hub.set_challenge_period(U256::from(7200)).unwrap();
+        assert_eq!(hub.challenge_period(), U256::from(7200));
+    }
+
+    #[test]
+    fn test_set_challenge_period_not_owner() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_sender(Address::from([0x99u8; 20]));
+        let err = hub.set_challenge_period(U256::from(7200)).unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: Address::from([0x99u8; 20]) }));
     }
 
     // ── confirm_delivery ────────────────────────────────────────────────────
@@ -720,7 +823,7 @@ mod tests {
 
     #[test]
     fn test_get_message_status_not_found() {
-        let (vm, hub, _owner) = setup();
+        let (_vm, hub, _owner) = setup();
         let err = hub.get_message_status(U256::from(999)).unwrap_err();
         assert_eq!(err, enc(MessageNotFound { messageId: U256::from(999) }));
     }
@@ -729,7 +832,7 @@ mod tests {
 
     #[test]
     fn test_calculate_fee() {
-        let (vm, hub, _owner) = setup();
+        let (_vm, hub, _owner) = setup();
         assert_eq!(hub.calculate_fee(84532), U256::from(500));
         assert_eq!(hub.calculate_fee(99999), U256::ZERO);
     }
@@ -833,5 +936,42 @@ mod tests {
         vm.set_sender(challenger);
         hub.challenge_message(id).unwrap();
         assert_eq!(hub.get_message_status(id).unwrap(), STATUS_FAILED);
+    }
+
+    // ── ownership transfer ─────────────────────────────────────────────────
+
+    #[test]
+    fn test_transfer_ownership() {
+        let (_vm, mut hub, owner) = setup();
+        let new_owner = Address::from([0x22u8; 20]);
+        hub.transfer_ownership(new_owner).unwrap();
+        assert_eq!(hub.owner(), owner); // unchanged
+    }
+
+    #[test]
+    fn test_transfer_ownership_not_owner() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_sender(Address::from([0x99u8; 20]));
+        let err = hub.transfer_ownership(Address::from([0x22u8; 20])).unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: Address::from([0x99u8; 20]) }));
+    }
+
+    #[test]
+    fn test_accept_ownership() {
+        let (vm, mut hub, _owner) = setup();
+        let new_owner = Address::from([0x22u8; 20]);
+        hub.transfer_ownership(new_owner).unwrap();
+        vm.set_sender(new_owner);
+        hub.accept_ownership().unwrap();
+        assert_eq!(hub.owner(), new_owner);
+    }
+
+    #[test]
+    fn test_accept_ownership_unauthorized() {
+        let (vm, mut hub, _owner) = setup();
+        hub.transfer_ownership(Address::from([0x22u8; 20])).unwrap();
+        vm.set_sender(Address::from([0x99u8; 20]));
+        let err = hub.accept_ownership().unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: Address::from([0x99u8; 20]) }));
     }
 }
