@@ -1,6 +1,6 @@
 {
   "name": "@arbilink/sdk",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "Cross-chain messaging SDK for Arbitrum — send messages to any chain with one function call",
   "keywords": [
     "arbitrum",
