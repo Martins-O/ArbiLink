@@ -3,6 +3,7 @@ import { Header }   from '@/components/Header';
 import Home         from '@/pages/Home';
 import { Demo }     from '@/pages/Demo';
 import Explorer     from '@/pages/Explorer';
+import NotFound     from '@/pages/NotFound';
 import './styles/globals.css';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
             <Route path="/"         element={<Home />}     />
             <Route path="/demo"     element={<Demo />}     />
             <Route path="/explorer" element={<Explorer />} />
+            <Route path="*"         element={<NotFound />} />
           </Routes>
         </main>
       </div>

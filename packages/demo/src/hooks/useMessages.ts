@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { JsonRpcProvider, Contract } from 'ethers'
 import type { Message } from '@/components/MessageCard'
-import MessageHubABI from '../../../sdk/src/abi/MessageHub.json'
-import { MESSAGE_HUB_ADDRESS } from '@arbilink/sdk'
+import { MessageHubABI, MESSAGE_HUB_ADDRESS } from '@arbilink/sdk'
 
 const ARBITRUM_SEPOLIA_RPC = import.meta.env.VITE_INFURA_KEY
   ? `https://arbitrum-sepolia.infura.io/v3/${import.meta.env.VITE_INFURA_KEY}`

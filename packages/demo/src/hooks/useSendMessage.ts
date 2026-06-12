@@ -3,8 +3,7 @@ import { useWalletClient, useChainId, useSwitchChain } from 'wagmi';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { ethers, JsonRpcProvider, Contract, Interface } from 'ethers';
 import { walletClientToSigner } from '../lib/utils';
-import MessageHubABI from '../../../sdk/src/abi/MessageHub.json';
-import { MESSAGE_HUB_ADDRESS } from '@arbilink/sdk';
+import { MessageHubABI, MESSAGE_HUB_ADDRESS } from '@arbilink/sdk';
 
 const ARBITRUM_SEPOLIA_RPC = import.meta.env.VITE_INFURA_KEY
   ? `https://arbitrum-sepolia.infura.io/v3/${import.meta.env.VITE_INFURA_KEY}`
