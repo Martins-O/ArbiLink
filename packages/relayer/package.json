@@ -7,13 +7,16 @@
   "scripts": {
     "start": "node --experimental-strip-types src/index.ts",
     "build": "tsc --project tsconfig.json",
-    "start:built": "node dist/index.js"
+    "start:built": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "ethers": "^6.13.0"
   },
   "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.4.0",
-    "@types/node": "^20.0.0"
+    "vitest": "^4.1.8"
   }
 }

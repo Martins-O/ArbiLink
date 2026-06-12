@@ -57,7 +57,7 @@ const POLL_INTERVAL_MS = 10_000;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-interface MessageStruct {
+export interface MessageStruct {
   id:               bigint;
   sender:           string;
   target:           string;
@@ -68,7 +68,7 @@ interface MessageStruct {
 
 // ── Env ────────────────────────────────────────────────────────────────────────
 
-function requireEnv(key: string): string {
+export function requireEnv(key: string): string {
   const v = process.env[key];
   if (!v) throw new Error(`Missing env var: ${key}`);
   return v;
@@ -86,7 +86,7 @@ function requireEnv(key: string): string {
  *
  * ethers `wallet.signMessage(bytes)` applies the same prefix automatically.
  */
-async function signMessage(
+export async function signMessage(
   message: MessageStruct,
   signingWallet: ethers.Wallet,
 ): Promise<string> {
