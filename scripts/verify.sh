@@ -22,7 +22,7 @@ echo "🔍  Verifying contracts..."
 
 # MessageHub (Stylus) on Arbitrum Sepolia
 echo "  Verifying MessageHub on Arbitrum Sepolia..."
-cargo +1.88.0 stylus verify \
+cargo +1.93.0 stylus verify \
     --endpoint="https://sepolia-rollup.arbitrum.io/rpc" \
     --deployment-tx="" \
     "${ROOT}/message-hub" 2>/dev/null

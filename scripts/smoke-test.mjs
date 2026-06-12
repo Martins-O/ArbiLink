@@ -21,7 +21,6 @@ const require = createRequire(relayerPkg);
 const ethers = require('ethers');
 
 // ── Load .env ─────────────────────────────────────────────────────────────────
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath   = path.join(__dirname, '..', '.env');
 try {
   const env = readFileSync(envPath, 'utf8');

@@ -58,11 +58,11 @@ HUB_SIGNING_KEY="${HUB_SIGNING_KEY:-}"
 # ── Toolchain setup ───────────────────────────────────────────────────────────
 # The system cargo may not understand +toolchain flags; resolve the 1.88.0
 # toolchain bin directory from rustup and prepend it to PATH.
-TOOLCHAIN_BIN="$(rustup run 1.88.0 rustc --print sysroot 2>/dev/null)/bin"
+TOOLCHAIN_BIN="$(rustup run 1.93.0 rustc --print sysroot 2>/dev/null)/bin"
 if [[ -d "${TOOLCHAIN_BIN}" ]]; then
     export PATH="${TOOLCHAIN_BIN}:${PATH}"
 else
-    warn "Could not locate Rust 1.88.0 toolchain via rustup – falling back to system cargo"
+    warn "Could not locate Rust 1.93.0 toolchain via rustup – falling back to system cargo"
 fi
 
 # ── Step 1: Build + optimise Stylus WASM ─────────────────────────────────────
@@ -144,14 +144,16 @@ deploy_receiver() {
     local RPC_URL="$1"
     pushd "${ROOT}/contracts/receiver" > /dev/null
     local BYTECODE
-    BYTECODE=$(python3 -c "
-import json, sys
-d = json.load(open('out/ArbiLinkReceiver.sol/ArbiLinkReceiver.json'))
-print(d['bytecode']['object'])
-")
+    BYTECODE=$(jq -r '.bytecode.object' "out/ArbiLinkReceiver.sol/ArbiLinkReceiver.json")
+    if [[ -z "${BYTECODE}" || "${BYTECODE}" == "null" ]]; then
+        die "Failed to read bytecode from out/ArbiLinkReceiver.sol/ArbiLinkReceiver.json"
+    fi
     local CTOR_ARGS
     CTOR_ARGS=$(cast abi-encode "constructor(address,address)" "${MESSAGE_HUB}" "${HUB_SIGNING_KEY}")
     local INIT_CODE="${BYTECODE}${CTOR_ARGS#0x}"
+    if [[ -z "${INIT_CODE}" ]]; then
+        die "Empty init code — cannot deploy"
+    fi
     local BASEFEE
     BASEFEE=$(cast base-fee --rpc-url="${RPC_URL}" 2>/dev/null || echo "1000000")
     local GAS_PRICE=$(( BASEFEE * 3 + 1000000000 ))
@@ -162,12 +164,7 @@ print(d['bytecode']['object'])
         --gas-price="${GAS_PRICE}" \
         --create "${INIT_CODE}" 2>&1)
     popd > /dev/null
-    echo "${RESULT}" | python3 -c "
-import sys, re
-d = sys.stdin.read()
-m = re.search(r'contractAddress\s+(0x[0-9a-fA-F]{40})', d)
-print(m.group(1) if m else '')
-"
+    grep -oE 'contractAddress\s+(0x[0-9a-fA-F]{40})' <<< "${RESULT}" | head -1 | awk '{print $2}'
 }
 
 # ── Step 5: Deploy Receiver to Ethereum Sepolia ───────────────────────────────
