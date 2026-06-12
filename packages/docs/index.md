@@ -97,9 +97,9 @@ import { ArbiLink } from '@arbilink/sdk';
 
 const arbiLink  = new ArbiLink(signer);
 const messageId = await arbiLink.sendMessage({
-  chainId: 11155111,   // Ethereum Sepolia
-  target:  '0xYourContract',
-  data:    encodedCall,
+  to:     11155111,   // Ethereum Sepolia
+  target: '0xYourContract',
+  data:   encodedCall,
 });
 
 // Real-time tracking

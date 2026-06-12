@@ -29,13 +29,13 @@ All guides follow the same structure:
 
 1. **Deploy receiver** — Deploy your contract on the destination chain
 2. **Authorize ArbiLink** — Restrict calls to `ArbiLinkReceiver` only
-3. **Encode call** — Use `viem`'s `encodeFunctionData`
+3. **Encode call** — Use the SDK's `encodeCall` helper
 4. **Send** — Call `arbiLink.sendMessage()`
 5. **Track** — Use `watchMessage()` for real-time status
 
 ```typescript
 // Universal pattern
-const data = encodeFunctionData({ abi, functionName, args });
+const data = encodeCall({ abi, functionName, args });
 const id   = await arbiLink.sendMessage({ to: chainId, target, data });
 arbiLink.watchMessage(id, (msg) => console.log(msg.status));
 ```

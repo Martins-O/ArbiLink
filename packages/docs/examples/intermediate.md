@@ -114,10 +114,10 @@ export function StatusBadge({ status }: { status: keyof typeof CONFIG }) {
 
 ```tsx
 // components/SendMessageForm.tsx
-import { useState }        from 'react';
-import { useSendMessage }  from '../hooks/useSendMessage';
-import { StatusBadge }     from './StatusBadge';
-import { encodeFunctionData } from 'viem';
+import { useState }          from 'react';
+import { useSendMessage }    from '../hooks/useSendMessage';
+import { StatusBadge }       from './StatusBadge';
+import { encodeCall }        from '@arbilink/sdk';
 
 const CHAINS = [
   { id: 11155111, name: 'Ethereum Sepolia' },
@@ -132,13 +132,13 @@ export function SendMessageForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    const data = encodeFunctionData({
+    const data = encodeCall({
       abi:          [{ name: 'execute', type: 'function', inputs: [] }],
       functionName: 'execute',
       args:         [],
     });
 
-    await send({ chainId, target, data });
+    await send({ to: chainId, target, data });
   }
 
   return (

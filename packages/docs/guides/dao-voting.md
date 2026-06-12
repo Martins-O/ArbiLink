@@ -72,8 +72,7 @@ contract CrossChainGovernor {
 ## Voting from Arbitrum
 
 ```typescript
-import { ArbiLink }           from '@arbilink/sdk';
-import { encodeFunctionData } from 'viem';
+import { ArbiLink, encodeCall } from '@arbilink/sdk';
 
 const GOVERNOR_ON_ETHEREUM = '0xYourGovernorAddress';
 const ETHEREUM_SEPOLIA     = 11155111;
@@ -86,8 +85,8 @@ async function voteOnProposal(
   voter:      string,
   vote:       VoteType,
 ) {
-  const data = encodeFunctionData({
-    abi: [{
+  const data = encodeCall({
+    abi:          [{
       name:   'castVoteCrossChain',
       type:   'function',
       inputs: [
@@ -98,12 +97,12 @@ async function voteOnProposal(
       ],
     }],
     functionName: 'castVoteCrossChain',
-    args: [proposalId, voter as `0x${string}`, vote, 421614n],
+    args:         [proposalId, voter, vote, 421614n],
   });
 
   const messageId = await arbiLink.sendMessage({
-    chainId: ETHEREUM_SEPOLIA,
-    target:  GOVERNOR_ON_ETHEREUM,
+    to:     ETHEREUM_SEPOLIA,
+    target: GOVERNOR_ON_ETHEREUM,
     data,
   });
 

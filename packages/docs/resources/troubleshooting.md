@@ -2,10 +2,10 @@
 
 ## SDK Errors
 
-### `NOT_CONNECTED` — Write method called without a Signer
+### Write method called without a Signer
 
 ```
-ArbiLinkError [NOT_CONNECTED]: A Signer is required for this operation
+ArbiLinkError: This operation requires a Signer. Initialize ArbiLink with an ethers.Signer instead of a Provider.
 ```
 
 **Fix:** Create `ArbiLink` with a Signer, not a Provider:
@@ -13,7 +13,7 @@ ArbiLinkError [NOT_CONNECTED]: A Signer is required for this operation
 ```typescript
 // ❌ Wrong — read-only
 const arbiLink = new ArbiLink(new JsonRpcProvider(rpc));
-await arbiLink.sendMessage(...); // throws NOT_CONNECTED
+await arbiLink.sendMessage(...); // throws
 
 // ✅ Correct — has signer
 const signer = await provider.getSigner();
@@ -22,25 +22,25 @@ const arbiLink = new ArbiLink(signer);
 
 ---
 
-### `CHAIN_NOT_SUPPORTED` — Unsupported destination chain
+### Unsupported destination chain
 
 ```
-ArbiLinkError [CHAIN_NOT_SUPPORTED]: Chain 1 is not registered in MessageHub
+ArbiLinkError: Failed to send message to chain 1
 ```
 
 **Fix:** Use a supported chain ID. Check `SUPPORTED_CHAINS`:
 
 ```typescript
 import { SUPPORTED_CHAINS } from '@arbilink/sdk';
-console.log(SUPPORTED_CHAINS.map(c => c.chainId));
-// [11155111, 84532]
+console.log(SUPPORTED_CHAINS.map(c => c.id));
+// [11155111, 84532, 80002]
 ```
 
-Supported chains: Ethereum Sepolia (`11155111`), Base Sepolia (`84532`).
+Supported chains: Ethereum Sepolia (`11155111`), Base Sepolia (`84532`), Polygon Amoy (`80002`).
 
 ---
 
-### `INSUFFICIENT_FEE` — Transaction value too low
+### Fee too low
 
 ```
 Error: execution reverted: InsufficientFee(provided, required)
@@ -50,9 +50,9 @@ Error: execution reverted: InsufficientFee(provided, required)
 
 ```typescript
 // The SDK handles fee calculation internally
-// If you're calling the contract directly, use get_fee():
-const fee = await hub.get_fee(chainId);
-await hub.send_message(chainId, target, data, { value: fee });
+// If you're calling the contract directly, use calculateFee():
+const fee = await hub.calculateFee(chainId);
+await hub.sendMessage(chainId, target, data, { value: fee });
 ```
 
 ---
@@ -68,7 +68,7 @@ await hub.send_message(chainId, target, data, { value: fee });
 | No active relayer on the network | Run the relayer node locally (see README) |
 | Wrong RPC endpoint | Verify `https://sepolia-rollup.arbitrum.io/rpc` responds |
 | Message ID incorrect | Double-check the ID returned by `sendMessage` |
-| Message failed silently | Check `get_message(id)` directly on the hub contract |
+| Message failed silently | Check `getMessageStatus(id)` directly |
 
 ---
 
@@ -131,7 +131,7 @@ export default defineConfig({
 
 | Revert reason | Cause | Fix |
 |---------------|-------|-----|
-| `Unauthorized` | `msg.sender` is not the registered relayer | Relayer not approved in receiver contract |
+| `Unauthorized` | `msg.sender` is not the registered relayer | Relayer not registered on the hub |
 | `Already processed` | Duplicate delivery | Message was already delivered |
 | Target call reverted | Your contract's function reverted | Debug the target contract independently |
 

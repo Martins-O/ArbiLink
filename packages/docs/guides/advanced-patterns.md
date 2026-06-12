@@ -21,8 +21,8 @@ async function sendWithRetry(
     } catch (err) {
       if (!(err instanceof ArbiLinkError)) throw err;
 
-      if (err.code === 'CHAIN_NOT_SUPPORTED') {
-        throw err; // Don't retry permanent errors
+      if (err.message.includes('Signer')) {
+        throw err; // Don't retry connection errors
       }
 
       if (attempt === retries) throw err;
@@ -81,11 +81,11 @@ async function sendWithFeeBuffer(
   params:   SendMessageParams,
   bufferBps = 1000, // 10% buffer
 ) {
-  const fee        = await arbiLink.calculateFee(params.chainId);
-  const feeWithBuf = fee + (fee * BigInt(bufferBps)) / 10_000n;
+  const to          = typeof params.to === 'number' ? params.to : resolveChainId(params.to);
+  const fee         = await arbiLink.calculateFee(to);
+  const feeWithBuf  = fee + (fee * BigInt(bufferBps)) / 10_000n;
 
-  // The SDK uses the fee internally — the buffer is passed via tx value
-  return arbiLink.sendMessage(params);
+  return arbiLink.sendMessage({ ...params, fee: feeWithBuf });
 }
 ```
 
@@ -135,7 +135,7 @@ Prevent sending the same message twice:
 const sentMessages = new Set<string>();
 
 function dedupeKey(params: SendMessageParams): string {
-  return `${params.chainId}:${params.target}:${params.data}`;
+  return `${params.to}:${params.target}:${params.data}`;
 }
 
 async function sendOnce(arbiLink: ArbiLink, params: SendMessageParams) {
@@ -167,7 +167,7 @@ function MintButton({ onMint }: { onMint: () => void }) {
 
     // 2. Send real message
     try {
-      await send({ chainId: 11155111, target, data });
+      await send({ to: 11155111, target, data });
     } catch {
       // 3. Rollback on failure
       setOptimistic(false);
@@ -192,11 +192,11 @@ arbiLink.sendMessage = async (params) => {
   const id    = await originalSend(params);
 
   console.log(JSON.stringify({
-    event:    'message_sent',
-    id:       id.toString(),
-    chainId:  params.chainId,
-    target:   params.target,
-    ts:       start,
+    event:   'message_sent',
+    id:      id.toString(),
+    to:      params.to,
+    target:  params.target,
+    ts:      start,
   }));
 
   return id;

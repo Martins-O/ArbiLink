@@ -45,9 +45,9 @@ const arbiLink  = new ArbiLink(provider);
 
 **With wagmi v2:**
 ```typescript
-import { useWalletClient }       from 'wagmi';
+import { useWalletClient } from 'wagmi';
 import { BrowserProvider, JsonRpcSigner } from 'ethers';
-import { ArbiLink }              from '@arbilink/sdk';
+import { ArbiLink } from '@arbilink/sdk';
 
 function useArbiLink() {
   const { data: walletClient } = useWalletClient();
@@ -56,22 +56,13 @@ function useArbiLink() {
     if (!walletClient) return null;
 
     const { account, chain, transport } = walletClient;
-    const network  = { chainId: chain!.id, name: chain!.name };
-    const provider = new BrowserProvider(transport as any, network);
+    const network  = { chainId: chain!.id as number, name: chain!.name };
+    const provider = new BrowserProvider(transport, network) as any;
     const signer   = new JsonRpcSigner(provider, account!.address);
 
     return new ArbiLink(signer);
   }, [walletClient]);
 }
-```
-
-## Properties
-
-The `ArbiLink` instance exposes two internal properties, useful for advanced use cases:
-
-```typescript
-arbiLink.hub      // ethers.Contract — the MessageHub contract on Arbitrum
-arbiLink.signer   // ethers.Signer | null — null when using a Provider
 ```
 
 ## Detecting Signer vs Provider
@@ -82,7 +73,7 @@ The SDK distinguishes signer from provider by checking for the `getAddress` meth
 const isSigner = 'getAddress' in signerOrProvider;
 ```
 
-Write operations (`sendMessage`, `registerRelayer`, `exitRelayer`) throw an `ArbiLinkError` with code `NOT_CONNECTED` if called on a read-only instance.
+Write operations (`sendMessage`, `registerRelayer`, `exitRelayer`, `withdrawProtocolFees`) throw an `ArbiLinkError` with message `"This operation requires a Signer…"` if called on a read-only instance.
 
 ## Connection Check
 
@@ -91,20 +82,30 @@ import { ArbiLink } from '@arbilink/sdk';
 
 const readOnly = new ArbiLink(provider);
 
-// Will throw ArbiLinkError: NOT_CONNECTED
+// Will throw ArbiLinkError: "This operation requires a Signer..."
 await readOnly.sendMessage({ ... });
 ```
 
 ## Multiple Chains
 
-The `ArbiLink` class always talks to Arbitrum Sepolia (chain 421614) as the hub. The `chainId` in `sendMessage` specifies the **destination** chain, not the source.
+The `ArbiLink` class always talks to Arbitrum Sepolia (chain 421614) as the hub. The `to` parameter in `sendMessage` specifies the **destination** chain, not the source.
 
 ```typescript
 // Source is always Arbitrum Sepolia
-// Destination is the chainId you pass in
+// Destination is the chain you pass in `to`
 await arbiLink.sendMessage({
-  chainId: 84532,  // Destination: Base Sepolia
+  to:     84532,       // Destination: Base Sepolia
   target: '0x...',
-  data: '0x...',
+  data:   '0x...',
+});
+```
+
+You can also use chain short names:
+
+```typescript
+await arbiLink.sendMessage({
+  to:     'base',
+  target: '0x...',
+  data:   '0x...',
 });
 ```

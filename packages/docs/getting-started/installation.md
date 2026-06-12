@@ -43,18 +43,24 @@ The SDK has the following peer dependencies:
 
 ## wagmi / RainbowKit Users
 
-If you're using wagmi v2, bridge the wallet client to an ethers signer using the included utility:
+If you're using wagmi v2, bridge the wallet client to an ethers signer:
 
 ```typescript
-import { walletClientToSigner } from '@arbilink/sdk/utils';
-import { useWalletClient } from 'wagmi';
+import { BrowserProvider, JsonRpcSigner } from 'ethers';
+import { useWalletClient }                from 'wagmi';
+import { ArbiLink }                       from '@arbilink/sdk';
 
 function useArbiLink() {
   const { data: walletClient } = useWalletClient();
 
   return useMemo(() => {
     if (!walletClient) return null;
-    const signer = walletClientToSigner(walletClient);
+
+    const { account, chain, transport } = walletClient;
+    const network   = { chainId: chain!.id as number, name: chain!.name };
+    const provider  = new BrowserProvider(transport, network) as any;
+    const signer    = new JsonRpcSigner(provider, account!.address);
+
     return new ArbiLink(signer);
   }, [walletClient]);
 }
@@ -87,6 +93,7 @@ import type {
   Message,
   MessageStatus,
   ChainConfig,
+  RelayerInfo,
   ArbiLinkError,
 } from '@arbilink/sdk';
 ```

@@ -12,9 +12,10 @@ Arbitrum Sepolia (Source Chain)
 │     │                                                   │
 │     │  sendMessage(chainId, target, data)               │
 │     ▼                                                   │
-│  MessageHub.sol (Rust / Stylus / WASM)                  │
+│  MessageHub (Rust / Stylus / WASM)                      │
 │     │  - Validates chainId is registered                │
 │     │  - Validates fee ≥ minimum                        │
+│     │  - Rejects zero target address                    │
 │     │  - Assigns messageId (auto-increment)             │
 │     │  - Stores message in mapping                      │
 │     │  - Emits MessageSent event                        │
@@ -38,7 +39,8 @@ Destination Chain (Ethereum / Base / Polygon / …)
 │  ArbiLinkReceiver.sol                                   │
 │     │  - Verifies ECDSA proof from relayer              │
 │     │  - Checks message not already processed           │
-│     │  - Calls target.call(data)                        │
+│     │  - Checks contract is not paused                  │
+│     │  - Calls target.call{gas: MAX_CALL_GAS}(data)     │
 │     │  - Records receipt                                │
 │     │  - Emits MessageReceived                          │
 │     ▼                                                   │
@@ -51,7 +53,8 @@ Destination Chain (Ethereum / Base / Polygon / …)
                      ▼
 ┌─────────────────────────────────────────────────────────┐
 │  MessageHub (Arbitrum Sepolia)                          │
-│     │  - confirm_delivery(messageId)                    │
+│     │  - confirmDelivery(messageId)                     │
+│     │  - Emits MessageRelayed                           │
 │     │  - Starts 5-min challenge window                  │
 │     │  - After window: status = CONFIRMED               │
 │     │  - Relayer stake returned + fee paid              │
@@ -74,13 +77,12 @@ Destination Chain (Ethereum / Base / Polygon / …)
 ArbiLink uses an **optimistic** approach — messages are executed immediately on the destination, then secured retroactively.
 
 1. Relayer executes the message
-2. Relayer calls `confirm_delivery(messageId)` on MessageHub
+2. Relayer calls `confirmDelivery(messageId)` on MessageHub
 3. A 5-minute challenge window opens
-4. Anyone can call `challenge_message(messageId)` if they believe the delivery was fraudulent
-5. If challenged, the MessageHub verifies against the execution proof
-6. If invalid: relayer is **slashed**, stake goes to challenger
-7. If valid: challenge is rejected, window continues
-8. After window closes: `finalize_message()` → `CONFIRMED`, stake returned
+4. Anyone can call `challengeMessage(messageId)` if they believe the delivery was fraudulent
+5. If challenged, the relay is invalidated — relayer is **slashed**, stake goes to challenger
+6. If unchallenged: window closes
+7. After window closes: `finalizeMessage()` → `CONFIRMED`, stake returned
 
 ### Relayer Incentives
 
@@ -110,7 +112,7 @@ function receiveMessage(uint256 messageId, ...) external {
 
 ### ECDSA Execution Proof
 
-Every delivery requires a signature proving the message was actually executed:
+Every delivery requires a signature from the relayer, proving the message was executed on the destination:
 
 ```
 proof = ECDSA.sign(
@@ -119,7 +121,7 @@ proof = ECDSA.sign(
 )
 ```
 
-The receiver verifies `proof` against the registered relayer address before executing.
+The receiver verifies `proof` against the MessageHub address (which is the authoritative verifier of relayer identity).
 
 ## Arbitrum Stylus (Rust)
 
@@ -134,8 +136,9 @@ impl MessageHub {
         target: Address,
         data: Bytes,
     ) -> Result<U256, Vec<u8>> {
-        let fee = self.get_fee(chain_id)?;
+        let fee = self.calculate_fee(chain_id)?;
         require!(msg::value() >= fee, InsufficientFee);
+        require!(target != Address::ZERO, InvalidInput);
 
         let id = self.message_count.get() + U256::from(1);
         self.message_count.set(id);
@@ -159,17 +162,17 @@ impl MessageHub {
 
 The `@arbilink/sdk` abstracts the ABI calls and provides:
 
-1. **Fee calculation** — calls `get_fee()` and caches result
-2. **Message encoding** — handles ABI encoding of `send_message` params
+1. **Fee calculation** — calls `calculateFee()` on the hub and caches result
+2. **Message encoding** — handles ABI encoding of `sendMessage` params
 3. **Event parsing** — extracts `messageId` from `MessageSent` log
 4. **Status polling** — wraps `get_message()` with exponential backoff
 5. **Watch subscriptions** — `setInterval` wrapper around `getMessageStatus`
 
 ```typescript
 // Internally, sendMessage does:
-const tx     = await this.hub.send_message(chainId, target, data, { value: fee });
+const tx      = await this.hub.sendMessage(chainId, target, data, { value: fee });
 const receipt = await tx.wait();
-const log    = receipt.logs.find(l => hubInterface.parseLog(l)?.name === 'MessageSent');
-const [id]   = hubInterface.parseLog(log).args;
-return id;
+const log     = receipt.logs.find(l => hubInterface.parseLog(l)?.name === 'MessageSent');
+const { messageId } = hubInterface.parseLog(log)?.args;
+return messageId as bigint;
 ```

@@ -7,8 +7,7 @@ Batch messages, relayer operations, and contract-to-contract patterns.
 Send multiple messages in one go and track all of them:
 
 ```typescript
-import { ArbiLink }           from '@arbilink/sdk';
-import { encodeFunctionData } from 'viem';
+import { ArbiLink, encodeCall } from '@arbilink/sdk';
 
 interface BatchItem {
   chainId: number;
@@ -23,9 +22,9 @@ async function sendBatch(arbiLink: ArbiLink, items: BatchItem[]) {
   const ids = await Promise.all(
     items.map(({ chainId, target, fnName, args, abi }) =>
       arbiLink.sendMessage({
-        chainId,
+        to:     chainId,
         target,
-        data: encodeFunctionData({ abi, functionName: fnName, args }),
+        data:   encodeCall({ abi, functionName: fnName, args }),
       })
     )
   );
@@ -73,7 +72,7 @@ async function registerAsRelayer() {
     return;
   }
 
-  // Register with default stake (0.1 ETH)
+  // Register with default stake
   await arbiLink.registerRelayer();
   console.log(`✅ Registered as relayer — ${address}`);
 
@@ -84,7 +83,7 @@ async function registerAsRelayer() {
 async function exitAsRelayer() {
   const arbiLink = new ArbiLink(signer);
   await arbiLink.exitRelayer();
-  console.log('Deregistered — stake returning after cooldown');
+  console.log('Deregistered — stake returned.');
 }
 ```
 
@@ -97,13 +96,13 @@ Call ArbiLink from another Solidity contract on Arbitrum:
 pragma solidity ^0.8.20;
 
 interface IMessageHub {
-    function send_message(
+    function sendMessage(
         uint256 chainId,
         address target,
         bytes calldata data
     ) external payable returns (uint256 messageId);
 
-    function get_fee(uint256 chainId) external view returns (uint256);
+    function calculateFee(uint256 chainId) external view returns (uint256);
 }
 
 contract AutomatedBridge {
@@ -123,9 +122,9 @@ contract AutomatedBridge {
         address target,
         bytes calldata callData
     ) external {
-        uint256 fee = hub.get_fee(destinationChain);
+        uint256 fee = hub.calculateFee(destinationChain);
 
-        uint256 messageId = hub.send_message{value: fee}(
+        uint256 messageId = hub.sendMessage{value: fee}(
             destinationChain,
             target,
             callData
@@ -165,9 +164,8 @@ async function indexMessages(fromBlock = 0) {
       return {
         id:        msg.id.toString(),
         sender:    msg.sender,
-        chainId:   msg.destination,
+        chainId:   msg.destinationChain,
         status:    msg.status,
-        timestamp: Number(msg.timestamp),
       };
     })
   );
@@ -184,9 +182,8 @@ console.table(history);
 
 ```typescript
 import { describe, it, expect, beforeAll } from 'vitest';
-import { ArbiLink }                         from '@arbilink/sdk';
+import { ArbiLink, encodeCall }             from '@arbilink/sdk';
 import { Wallet, JsonRpcProvider }          from 'ethers';
-import { encodeFunctionData }               from 'viem';
 
 describe('ArbiLink cross-chain', () => {
   let arbiLink: ArbiLink;
@@ -203,15 +200,15 @@ describe('ArbiLink cross-chain', () => {
   });
 
   it('sends a message and gets a valid ID', async () => {
-    const data = encodeFunctionData({
-      abi: [{ name: 'ping', type: 'function', inputs: [] }],
+    const data = encodeCall({
+      abi:          [{ name: 'ping', type: 'function', inputs: [] }],
       functionName: 'ping',
-      args: [],
+      args:         [],
     });
 
     const id = await arbiLink.sendMessage({
-      chainId: 11155111,
-      target:  process.env.TEST_CONTRACT!,
+      to:     11155111,
+      target: process.env.TEST_CONTRACT!,
       data,
     });
 
