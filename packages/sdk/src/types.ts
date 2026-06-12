@@ -59,6 +59,7 @@ export interface WatchOptions {
 export interface RelayerInfo {
   active: boolean;
   stake: bigint;
+  successfulDeliveries: bigint;
 }
 
 // ── Error ─────────────────────────────────────────────────────────────────────

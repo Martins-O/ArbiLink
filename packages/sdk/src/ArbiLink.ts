@@ -1,7 +1,7 @@
 import { ethers } from 'ethers';
 import MessageHubABI from './abi/MessageHub.json';
 import { MESSAGE_HUB_ADDRESS } from './constants';
-import { ArbiLinkError, type Message, type MessageStatus, type SendMessageParams, type WatchOptions } from './types';
+import { ArbiLinkError, type Message, type MessageStatus, type RelayerInfo, type SendMessageParams, type WatchOptions } from './types';
 import { parseStatusCode, resolveChainId } from './utils';
 
 // ── ArbiLink SDK ──────────────────────────────────────────────────────────────
@@ -148,13 +148,20 @@ export class ArbiLink {
         feePaid          = e.args.fee              as bigint;
       }
 
-      // Enrich from MessageConfirmed event (present only when confirmed)
+      // Enrich relayer from MessageRelayed or MessageConfirmed events
       let relayer: string | undefined;
-      if (status === 'confirmed') {
-        const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
-        const confirmedLogs   = await this.messageHub.queryFilter(confirmedFilter);
-        if (confirmedLogs.length > 0) {
-          relayer = (confirmedLogs[0] as ethers.EventLog).args.relayer as string;
+      if (status === 'relayed' || status === 'confirmed') {
+        const relayedFilter = this.messageHub.filters['MessageRelayed'](messageId);
+        const relayedLogs   = await this.messageHub.queryFilter(relayedFilter);
+        if (relayedLogs.length > 0) {
+          relayer = (relayedLogs[0] as ethers.EventLog).args.relayer as string;
+        } else {
+          // Fallback to MessageConfirmed for already-finalized messages
+          const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
+          const confirmedLogs   = await this.messageHub.queryFilter(confirmedFilter);
+          if (confirmedLogs.length > 0) {
+            relayer = (confirmedLogs[0] as ethers.EventLog).args.relayer as string;
+          }
         }
       }
 
@@ -213,6 +220,7 @@ export class ArbiLink {
     callback: (message: Message) => void,
     _options: WatchOptions = {},
   ): () => void {
+    const relayedFilter   = this.messageHub.filters['MessageRelayed'](messageId);
     const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
 
     const listener = async (): Promise<void> => {
@@ -220,15 +228,15 @@ export class ArbiLink {
         const msg = await this.getMessageStatus(messageId);
         callback(msg);
       } catch (err) {
-        // Surface the error through the callback rather than throwing from
-        // an event listener (which would be silently swallowed by ethers)
         console.error('[ArbiLink] watchMessage error:', err);
       }
     };
 
+    this.messageHub.on(relayedFilter, listener);
     this.messageHub.on(confirmedFilter, listener);
 
     return () => {
+      this.messageHub.off(relayedFilter, listener);
       this.messageHub.off(confirmedFilter, listener);
     };
   }
@@ -287,6 +295,31 @@ export class ArbiLink {
    */
   async minStake(): Promise<bigint> {
     return await this.messageHub.minStake() as bigint;
+  }
+
+  /**
+   * Fetch relayer info: active status, stake amount, and successful delivery count.
+   */
+  async getRelayerInfo(address: string): Promise<RelayerInfo> {
+    const [active, stake, successfulDeliveries] =
+      await this.messageHub.getRelayerInfo(address) as [boolean, bigint, bigint];
+    return { active, stake, successfulDeliveries };
+  }
+
+  /**
+   * Withdraw accumulated protocol fees. Only callable by the hub owner.
+   */
+  async withdrawProtocolFees(): Promise<void> {
+    this.requireSigner();
+    const tx = await this.messageHub.withdrawProtocolFees() as ethers.TransactionResponse;
+    await tx.wait();
+  }
+
+  /**
+   * Fetch the current challenge period in seconds.
+   */
+  async challengePeriod(): Promise<bigint> {
+    return await this.messageHub.challengePeriod() as bigint;
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────

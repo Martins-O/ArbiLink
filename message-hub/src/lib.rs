@@ -1,4 +1,19 @@
 //! ArbiLink MessageHub – cross-chain messaging hub on Arbitrum Stylus
+//!
+//! ## Message lifecycle
+//!
+//! ```text
+//! PENDING ──► RELAYED ──► CONFIRMED
+//!                 │
+//!                 └──► FAILED  (successful challenge)
+//! ```
+//!
+//! | Status | Name       | Meaning                                      |
+//! |--------|------------|----------------------------------------------|
+//! | 0      | PENDING    | Sent, awaiting relayer delivery              |
+//! | 1      | RELAYED    | Delivered, in challenge window               |
+//! | 2      | CONFIRMED  | Finalized after challenge window expired     |
+//! | 3      | FAILED     | Relayer was slashed via fraud proof          |
 
 #![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
@@ -20,14 +35,25 @@ sol! {
         bytes   data,
         uint256 fee
     );
+    event MessageRelayed(
+        uint256 indexed messageId,
+        address indexed relayer,
+        uint256 deadline
+    );
     event MessageConfirmed(
         uint256 indexed messageId,
         address indexed relayer,
         uint256 timestamp
     );
+    event MessageChallenged(
+        uint256 indexed messageId,
+        address indexed challenger,
+        address indexed relayer
+    );
     event RelayerRegistered(address indexed relayer, uint256 stake);
     event RelayerExited(address indexed relayer, uint256 returned);
     event ChainAdded(uint32 indexed chainId, address receiver, uint256 baseFee);
+    event FeesWithdrawn(address indexed owner, uint256 amount);
 
     error ChainNotSupported(uint32 chainId);
     error InsufficientFee(uint256 required, uint256 provided);
@@ -39,6 +65,11 @@ sol! {
     error TransferFailed();
     error ZeroAddress();
     error AlreadyInitialized();
+    error ChallengeWindowNotExpired(uint256 messageId, uint256 deadline);
+    error ChallengeWindowExpired(uint256 messageId);
+    error CannotChallenge(uint256 messageId, uint8 status);
+    error NoStakeToSlash(address relayer);
+    error NothingToWithdraw();
 }
 
 sol_storage! {
@@ -50,6 +81,7 @@ sol_storage! {
         uint256 fee_paid;
         uint8   status;
         address relayer;
+        uint256 challenge_deadline;
     }
     pub struct StoredChainConfig {
         bool    enabled;
@@ -59,6 +91,7 @@ sol_storage! {
     pub struct StoredRelayerInfo {
         bool    active;
         uint256 stake;
+        uint256 successful_deliveries;
     }
     #[entrypoint]
     pub struct MessageHub {
@@ -73,9 +106,12 @@ sol_storage! {
     }
 }
 
-const STATUS_PENDING: u8   = 0;
-const STATUS_CONFIRMED: u8 = 1;
-const RELAYER_REWARD_BPS: u64 = 8_000;
+const STATUS_PENDING: u8    = 0;
+const STATUS_RELAYED: u8    = 1;
+const STATUS_CONFIRMED: u8  = 2;
+const STATUS_FAILED: u8     = 3;
+const RELAYER_REWARD_BPS: u64    = 8_000; // 80% of fee
+const CHALLENGER_REWARD_BPS: u64 = 1_000; // 10% of slashed stake
 
 fn enc<E: SolError>(e: E) -> Vec<u8> { e.abi_encode() }
 
@@ -111,6 +147,7 @@ impl MessageHub {
             m.fee_paid.set(val);
             m.status.set(U8::from(STATUS_PENDING));
             m.relayer.set(Address::ZERO);
+            m.challenge_deadline.set(U256::ZERO);
         }
         self.protocol_fee_balance.set(self.protocol_fee_balance.get() + val);
         self.vm().log(MessageSent { messageId: id, sender, destinationChain: destination_chain, target, data, fee: val });
@@ -125,15 +162,78 @@ impl MessageHub {
         let st = self.messages.getter(message_id).status.get().to::<u8>();
         if st != STATUS_PENDING { return Err(enc(AlreadyRelayed { messageId: message_id })); }
         let fee = self.messages.getter(message_id).fee_paid.get();
+        let deadline = U256::from(self.vm().block_timestamp()) + self.challenge_period.get();
         {
             let mut m = self.messages.setter(message_id);
-            m.status.set(U8::from(STATUS_CONFIRMED));
+            m.status.set(U8::from(STATUS_RELAYED));
             m.relayer.set(relayer);
+            m.challenge_deadline.set(deadline);
         }
         let reward = fee * U256::from(RELAYER_REWARD_BPS) / U256::from(10_000u64);
         self.protocol_fee_balance.set(self.protocol_fee_balance.get() - reward);
         transfer_eth(self.vm(), relayer, reward).map_err(|_| enc(TransferFailed {}))?;
-        self.vm().log(MessageConfirmed { messageId: message_id, relayer, timestamp: U256::from(self.vm().block_timestamp()) });
+        self.vm().log(MessageRelayed { messageId: message_id, relayer, deadline });
+        Ok(())
+    }
+
+    pub fn challenge_message(&mut self, message_id: U256) -> Result<(), Vec<u8>> {
+        let challenger = self.vm().msg_sender();
+        let ts = self.messages.getter(message_id).timestamp.get();
+        if ts == U256::ZERO { return Err(enc(MessageNotFound { messageId: message_id })); }
+        let st = self.messages.getter(message_id).status.get().to::<u8>();
+        if st != STATUS_RELAYED { return Err(enc(CannotChallenge { messageId: message_id, status: st })); }
+        let deadline = self.messages.getter(message_id).challenge_deadline.get();
+        let now = U256::from(self.vm().block_timestamp());
+        if now > deadline { return Err(enc(ChallengeWindowExpired { messageId: message_id })); }
+        let relayer_addr = self.messages.getter(message_id).relayer.get();
+        {
+            let mut m = self.messages.setter(message_id);
+            m.status.set(U8::from(STATUS_FAILED));
+        }
+        let stake = self.relayers.getter(relayer_addr).stake.get();
+        if stake == U256::ZERO { return Err(enc(NoStakeToSlash { relayer: relayer_addr })); }
+        {
+            let mut ri = self.relayers.setter(relayer_addr);
+            ri.active.set(false);
+            ri.stake.set(U256::ZERO);
+        }
+        let challenger_reward = stake * U256::from(CHALLENGER_REWARD_BPS) / U256::from(10_000u64);
+        let remainder = stake - challenger_reward;
+        self.protocol_fee_balance.set(self.protocol_fee_balance.get() + remainder);
+        transfer_eth(self.vm(), challenger, challenger_reward).map_err(|_| enc(TransferFailed {}))?;
+        self.vm().log(MessageChallenged { messageId: message_id, challenger, relayer: relayer_addr });
+        Ok(())
+    }
+
+    pub fn finalize_message(&mut self, message_id: U256) -> Result<(), Vec<u8>> {
+        let ts = self.messages.getter(message_id).timestamp.get();
+        if ts == U256::ZERO { return Err(enc(MessageNotFound { messageId: message_id })); }
+        let st = self.messages.getter(message_id).status.get().to::<u8>();
+        if st != STATUS_RELAYED { return Err(enc(AlreadyRelayed { messageId: message_id })); }
+        let deadline = self.messages.getter(message_id).challenge_deadline.get();
+        let now = U256::from(self.vm().block_timestamp());
+        if now <= deadline { return Err(enc(ChallengeWindowNotExpired { messageId: message_id, deadline })); }
+        let relayer_addr = self.messages.getter(message_id).relayer.get();
+        {
+            let mut m = self.messages.setter(message_id);
+            m.status.set(U8::from(STATUS_CONFIRMED));
+        }
+        let count = self.relayers.getter(relayer_addr).successful_deliveries.get();
+        {
+            let mut ri = self.relayers.setter(relayer_addr);
+            ri.successful_deliveries.set(count + U256::from(1u8));
+        }
+        self.vm().log(MessageConfirmed { messageId: message_id, relayer: relayer_addr, timestamp: U256::from(self.vm().block_timestamp()) });
+        Ok(())
+    }
+
+    pub fn withdraw_protocol_fees(&mut self) -> Result<(), Vec<u8>> {
+        self.only_owner()?;
+        let balance = self.protocol_fee_balance.get();
+        if balance == U256::ZERO { return Err(enc(NothingToWithdraw {})); }
+        self.protocol_fee_balance.set(U256::ZERO);
+        transfer_eth(self.vm(), self.owner.get(), balance).map_err(|_| enc(TransferFailed {}))?;
+        self.vm().log(FeesWithdrawn { owner: self.owner.get(), amount: balance });
         Ok(())
     }
 
@@ -173,6 +273,11 @@ impl MessageHub {
         Ok(self.messages.getter(id).status.get().to::<u8>())
     }
 
+    pub fn get_relayer_info(&self, r: Address) -> (bool, U256, U256) {
+        let ri = self.relayers.getter(r);
+        (ri.active.get(), ri.stake.get(), ri.successful_deliveries.get())
+    }
+
     pub fn calculate_fee(&self, destination_chain: u32) -> U256 {
         self.supported_chains.getter(U32::from(destination_chain)).base_fee.get()
     }
@@ -181,6 +286,8 @@ impl MessageHub {
     pub fn message_count(&self) -> U256                 { self.message_nonce.get() }
     pub fn owner(&self) -> Address                      { self.owner.get() }
     pub fn min_stake(&self) -> U256                     { self.min_stake.get() }
+    pub fn protocol_fee_balance(&self) -> U256          { self.protocol_fee_balance.get() }
+    pub fn challenge_period(&self) -> U256              { self.challenge_period.get() }
 }
 
 impl MessageHub {

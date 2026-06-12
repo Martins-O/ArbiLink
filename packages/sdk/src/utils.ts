@@ -90,11 +90,16 @@ export function estimateDeliveryTime(chainId: number): number {
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
-// Contract STATUS_PENDING=0, STATUS_CONFIRMED=1.
-// 'relayed' and 'challenged' are reserved for the future challenge system.
+// Matches STATUS_* constants in the MessageHub contract:
+//   0 = PENDING     → 'pending'
+//   1 = RELAYED     → 'relayed'
+//   2 = CONFIRMED   → 'confirmed'
+//   3 = FAILED      → 'failed'
 const STATUS_MAP: Record<number, MessageStatus> = {
   0: 'pending',
-  1: 'confirmed',
+  1: 'relayed',
+  2: 'confirmed',
+  3: 'failed',
 };
 
 /**
