@@ -59,8 +59,8 @@ const data = encodeFunctionData({
 
 ```typescript
 const messageId = await arbiLink.sendMessage({
-  chainId: ETHEREUM_SEPOLIA_CHAIN_ID,
-  target:  '0xYourContractOnEthereumSepolia',
+  to:     ETHEREUM_SEPOLIA_CHAIN_ID,
+  target: '0xYourContractOnEthereumSepolia',
   data,
 });
 
@@ -113,7 +113,7 @@ async function sendCrossChainMessage() {
   console.log(`Sending for ${ethers.formatEther(fee)} ETH`);
 
   // 4. Send
-  const messageId = await arbiLink.sendMessage({ chainId, target, data });
+  const messageId = await arbiLink.sendMessage({ to: chainId, target, data });
   console.log(`Sent → message #${messageId}`);
 
   // 5. Watch

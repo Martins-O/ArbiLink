@@ -113,13 +113,13 @@ A **relayer** (any staked party) picks up the `MessageSent` event, calls `receiv
 The **ArbiLinkReceiver** verifies the ECDSA execution proof signed by the hub's signing key, checks that the message hasn't been replayed, then performs `target.call(data)` — executing the requested function on behalf of the original sender. A receipt is stored on-chain.
 
 ### Step 4 — Confirm (Arbitrum)
-The relayer calls `confirm_delivery()` on the **MessageHub**, submitting the execution proof. The hub opens a **5-minute challenge window** and immediately pays 80% of the fee to the relayer.
+The relayer calls `confirmDelivery()` on the **MessageHub**, submitting the execution proof. The hub opens a **challenge window** and immediately pays 80% of the fee to the relayer.
 
 ### Step 5 — Challenge (Optional, Arbitrum)
-Anyone who can prove the message was NOT executed (or was executed fraudulently) calls `challenge_message()` with a fraud proof during the window. A valid challenge **slashes the relayer's full stake** — 10% goes to the challenger, the rest to the protocol treasury.
+Anyone who can prove the message was NOT executed (or was executed fraudulently) calls `challengeMessage()` during the window. A valid challenge **slashes the relayer's full stake** — 10% goes to the challenger, the rest to the protocol treasury.
 
 ### Step 6 — Finalize (Arbitrum)
-After the challenge window closes without a successful challenge, `finalize_message()` marks the message as **confirmed** and increments the relayer's success count.
+After the challenge window closes without a successful challenge, `finalizeMessage()` marks the message as **confirmed** and increments the relayer's success count.
 
 ---
 
@@ -175,8 +175,8 @@ arbilink/
 │       ├── api/
 │       └── .vitepress/
 │
-├── Dockerfile                    # Relayer container (for Railway)
-├── railway.toml                  # Railway deployment config
+├── Dockerfile                    # Relayer container (for Render)
+├── render.yaml                   # Render deployment config
 ├── scripts/
 │   ├── deploy.sh                 # Full multi-chain deployment
 │   └── verify.sh                 # Block explorer verification
@@ -204,14 +204,18 @@ The hub is the heart of the protocol, deployed on **Arbitrum Sepolia** as a WASM
 | Function | Description |
 |----------|-------------|
 | `sendMessage(chain, target, data)` | Send a cross-chain message (payable) |
-| `confirmDelivery(id, proof)` | Relayer confirms execution with proof |
-| `challengeMessage(id, proof)` | Challenge a fraudulent delivery |
-| `finalizeMessage(id)` | Finalize after challenge window |
+| `confirmDelivery(id, proof)` | Relayer confirms execution with proof, opens challenge window |
+| `challengeMessage(id)` | Challenge a fraudulent delivery during window (slashes relayer) |
+| `finalizeMessage(id)` | Finalize after challenge window expires |
+| `withdrawProtocolFees()` | Owner: drain accumulated protocol fees |
 | `registerRelayer()` | Stake ETH to become a relayer (payable) |
 | `exitRelayer()` | Withdraw stake and deregister |
 | `addChain(chainId, receiver, fee)` | Owner: register a destination chain |
 | `calculateFee(chainId)` | View: get base fee for a destination |
 | `getMessageStatus(id)` | View: 0=Pending 1=Relayed 2=Confirmed 3=Failed |
+| `getRelayerInfo(addr)` | View: active, stake, successfulDeliveries |
+| `protocolFeeBalance()` | View: accumulated protocol fees (wei) |
+| `challengePeriod()` | View: challenge window duration (seconds) |
 
 ---
 
@@ -477,7 +481,7 @@ PENDING ──► RELAYED ──► CONFIRMED
 | Status Code | Name | Meaning |
 |-------------|------|---------|
 | 0 | `PENDING` | Sent but not yet delivered |
-| 1 | `RELAYED` | Delivered — in 5-min challenge window |
+| 1 | `RELAYED` | Delivered — in challenge window |
 | 2 | `CONFIRMED` | Challenge window closed, message finalized |
 | 3 | `FAILED` | Relayer was slashed via fraud proof |
 
@@ -543,7 +547,7 @@ ArbiLink uses an **optimistic** security model — it assumes messages are deliv
 - **ECDSA proof verification** — the receiver will not execute any message that isn't signed by the hub's designated signing key, preventing forgery.
 - **CEI pattern** — the receiver marks a message as processed *before* making the external call, preventing reentrancy exploits.
 
-> **Note:** The hackathon version uses simplified proof stubs in the hub (`proof.len() >= 65 && proof[0] != 0`). A production deployment would replace these with full `ecrecover` verification against the destination receiver's signing key.
+> **Note:** The proof parameter in `confirmDelivery` is accepted but not yet verified on-chain (intended for future `ecrecover` integration). Relayer fraud is currently detected via timely challenges during the challenge window.
 
 ---
 

@@ -207,9 +207,9 @@ export function Demo() {
                 <span className="text-slate-300">{'({'}</span>
                 <br />
                 <span className="pl-4">
-                  <span className="text-cyan-400">chainId</span>
+                  <span className="text-cyan-400">to</span>
                   <span className="text-slate-300">: </span>
-                  <span className="text-amber-400">{CHAIN_ID[destination] || '…'}</span>
+                  <span className="text-amber-400">'{destination}'</span>
                   <span className="text-slate-300">,</span>
                 </span>
                 <br />
