@@ -9,6 +9,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # pnpm v10 ignores build scripts by default; allow all for CI
+  NPM_CONFIG_ONLY_BUILT_DEPENDENCIES: '[]'
 
 jobs:
   message-hub:
@@ -34,8 +36,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: latest
-          run_install: |
-            - recursive: true
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @arbilink/sdk test
 
   relayer:
@@ -49,8 +50,7 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: latest
-          run_install: |
-            - recursive: true
+      - run: pnpm install --no-frozen-lockfile
       - run: pnpm --filter @arbilink/relayer test
 
   receiver:
@@ -61,6 +61,7 @@ jobs:
         with:
           submodules: recursive
       - uses: foundry-rs/foundry-toolchain@v1
-      - run: forge install foundry-rs/forge-std --no-commit 2>&1 || echo "forge-std already installed"
+      - run: forge install foundry-rs/forge-std --no-commit
+        working-directory: contracts/receiver
       - run: forge test
         working-directory: contracts/receiver
