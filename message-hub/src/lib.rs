@@ -15,7 +15,7 @@
 //! | 2      | CONFIRMED  | Finalized after challenge window expired     |
 //! | 3      | FAILED     | Relayer was slashed via fraud proof          |
 
-#![cfg_attr(not(feature = "export-abi"), no_main)]
+#![cfg_attr(not(any(test, feature = "export-abi")), no_main)]
 extern crate alloc;
 
 use alloc::vec::Vec;
@@ -300,3 +300,538 @@ impl MessageHub {
 
 #[cfg(feature = "export-abi")]
 pub fn export_abi_string() -> &'static str { "" }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use stylus_sdk::testing::*;
+
+    /// Helper: deploy and init MessageHub, returning (vm, hub, owner).
+    fn setup() -> (TestVM, MessageHub, Address) {
+        let vm = TestVM::default();
+        // Set a non-zero block timestamp so that stored messages have non-zero
+        // timestamps (the contract uses `timestamp == 0` as "not found" sentinel).
+        vm.set_block_timestamp(1_000_000);
+        let mut hub = MessageHub::from(&vm);
+        let owner = vm.msg_sender();
+        hub.initialize(U256::from(100), U256::from(3600)).unwrap();
+        let receiver = Address::from([0x01u8; 20]);
+        hub.add_chain(84532, receiver, U256::from(500)).unwrap();
+        (vm, hub, owner)
+    }
+
+    /// Helper: fund the contract with ETH (needed for transfer_eth).
+    fn fund_contract(vm: &TestVM) {
+        let ct_addr = Address::from([0x05u8; 20]);
+        vm.set_balance(ct_addr, U256::from(100_000));
+    }
+
+    /// Helper: send a message on an already-setup hub, returns message_id.
+    fn send_msg(vm: &TestVM, hub: &mut MessageHub, val: u64) -> U256 {
+        let target = Address::from([0xAAu8; 20]);
+        let data = Bytes::from(vec![1u8, 2, 3]);
+        vm.set_value(U256::from(val));
+        hub.send_message(84532, target, data).unwrap()
+    }
+
+    /// Assert that two ABI error encodings match (handles selector differences).
+    fn assert_error_eq(got: &[u8], expected: &[u8]) {
+        if got != expected {
+            // Fallback: just check that the function returned an error
+            // (skip selector check since sol! encoding may differ)
+            panic!(
+                "error mismatch\ngot:      {got:?}\nexpected: {expected:?}\n\
+                 got sel:      {:02x}{:02x}{:02x}{:02x}\n\
+                 expected sel: {:02x}{:02x}{:02x}{:02x}",
+                got[0], got[1], got[2], got[3],
+                expected[0], expected[1], expected[2], expected[3],
+            );
+        }
+    }
+
+    // ── initialize ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_initialize() {
+        let vm = TestVM::new();
+        let mut hub = MessageHub::from(&vm);
+        let owner = vm.msg_sender();
+        assert!(hub.initialize(U256::from(100), U256::from(3600)).is_ok());
+        assert_eq!(hub.owner(), owner);
+        assert_eq!(hub.min_stake(), U256::from(100));
+        assert_eq!(hub.challenge_period(), U256::from(3600));
+    }
+
+    #[test]
+    fn test_double_initialize_fails() {
+        let vm = TestVM::new();
+        let mut hub = MessageHub::from(&vm);
+        assert!(hub.initialize(U256::from(100), U256::from(3600)).is_ok());
+        let err = hub.initialize(U256::from(200), U256::from(7200)).unwrap_err();
+        assert_eq!(err, enc(AlreadyInitialized {}));
+    }
+
+    // ── add_chain ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_add_chain() {
+        let vm = TestVM::new();
+        let mut hub = MessageHub::from(&vm);
+        hub.initialize(U256::from(100), U256::from(3600)).unwrap();
+
+        let receiver = Address::from([0x42u8; 20]);
+        assert!(hub.add_chain(42161, receiver, U256::from(1000)).is_ok());
+        assert_eq!(hub.calculate_fee(42161), U256::from(1000));
+    }
+
+    #[test]
+    fn test_add_chain_not_owner() {
+        let vm = TestVM::new();
+        let mut hub = MessageHub::from(&vm);
+        hub.initialize(U256::from(100), U256::from(3600)).unwrap();
+
+        let non_owner = Address::from([0x99u8; 20]);
+        vm.set_sender(non_owner);
+        let receiver = Address::from([0x42u8; 20]);
+        let err = hub.add_chain(42161, receiver, U256::from(1000)).unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: non_owner }));
+    }
+
+    #[test]
+    fn test_add_chain_zero_receiver() {
+        let vm = TestVM::new();
+        let mut hub = MessageHub::from(&vm);
+        hub.initialize(U256::from(100), U256::from(3600)).unwrap();
+
+        let err = hub.add_chain(42161, Address::ZERO, U256::from(1000)).unwrap_err();
+        assert_eq!(err, enc(ZeroAddress {}));
+    }
+
+    // ── send_message ────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_send_message() {
+        let (vm, mut hub, _owner) = setup();
+        let id = send_msg(&vm, &mut hub, 500);
+        assert_eq!(id, U256::from(1));
+        assert_eq!(hub.message_count(), U256::from(1));
+    }
+
+    #[test]
+    fn test_send_message_unsupported_chain() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_value(U256::from(500));
+        let target = Address::from([0xBBu8; 20]);
+        let err = hub.send_message(99999, target, Bytes::from(vec![])).unwrap_err();
+        assert_eq!(err, enc(ChainNotSupported { chainId: 99999 }));
+    }
+
+    #[test]
+    fn test_send_message_insufficient_fee() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_value(U256::from(100)); // base_fee is 500
+        let target = Address::from([0xBBu8; 20]);
+        let err = hub.send_message(84532, target, Bytes::from(vec![])).unwrap_err();
+        assert_eq!(err, enc(InsufficientFee { required: U256::from(500), provided: U256::from(100) }));
+    }
+
+    #[test]
+    fn test_send_message_multiple_increments_nonce() {
+        let (vm, mut hub, _owner) = setup();
+        let id1 = send_msg(&vm, &mut hub, 500);
+        let id2 = send_msg(&vm, &mut hub, 500);
+        assert_eq!(id1, U256::from(1));
+        assert_eq!(id2, U256::from(2));
+        assert_eq!(hub.message_count(), U256::from(2));
+    }
+
+    // ── register_relayer / exit_relayer ─────────────────────────────────────
+
+    #[test]
+    fn test_register_relayer() {
+        let (vm, mut hub, _owner) = setup();
+        let relayer = vm.msg_sender();
+        vm.set_value(U256::from(200));
+        assert!(hub.register_relayer().is_ok());
+        assert!(hub.is_active_relayer(relayer));
+        let (_active, stake, _success) = hub.get_relayer_info(relayer);
+        assert_eq!(stake, U256::from(200));
+    }
+
+    #[test]
+    fn test_register_relayer_insufficient_stake() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_value(U256::from(50)); // min_stake is 100
+        let err = hub.register_relayer().unwrap_err();
+        assert_eq!(err, enc(InsufficientStake { required: U256::from(100), provided: U256::from(50) }));
+    }
+
+    #[test]
+    fn test_register_relayer_accumulate_stake() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+        vm.set_value(U256::from(300));
+        hub.register_relayer().unwrap();
+        let relayer = vm.msg_sender();
+        let (_active, stake, _success) = hub.get_relayer_info(relayer);
+        assert_eq!(stake, U256::from(500));
+    }
+
+    #[test]
+    fn test_exit_relayer() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+        let relayer = vm.msg_sender();
+        assert!(hub.exit_relayer().is_ok());
+        assert!(!hub.is_active_relayer(relayer));
+        let (_active, stake, _success) = hub.get_relayer_info(relayer);
+        assert_eq!(stake, U256::ZERO);
+    }
+
+    #[test]
+    fn test_exit_relayer_not_active() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_sender(Address::from([0x99u8; 20]));
+        let err = hub.exit_relayer().unwrap_err();
+        assert_eq!(err, enc(RelayerNotActive { relayer: vm.msg_sender() }));
+    }
+
+    // ── confirm_delivery ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_confirm_delivery() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_RELAYED);
+    }
+
+    #[test]
+    fn test_confirm_delivery_not_active_relayer() {
+        let (vm, mut hub, _owner) = setup();
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        let err = hub.confirm_delivery(id, Bytes::from(vec![])).unwrap_err();
+        assert_eq!(err, enc(RelayerNotActive { relayer }));
+    }
+
+    #[test]
+    fn test_confirm_delivery_nonexistent_message() {
+        let (vm, mut hub, _owner) = setup();
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        let err = hub.confirm_delivery(U256::from(999), Bytes::from(vec![])).unwrap_err();
+        assert_eq!(err, enc(MessageNotFound { messageId: U256::from(999) }));
+    }
+
+    // ── challenge_message ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_challenge_message() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+
+        let challenger = Address::from([0xBBu8; 20]);
+        vm.set_sender(challenger);
+        hub.challenge_message(id).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_FAILED);
+    }
+
+    #[test]
+    fn test_challenge_message_not_relayed() {
+        let (vm, mut hub, _owner) = setup();
+        let id = send_msg(&vm, &mut hub, 500);
+
+        let err = hub.challenge_message(id).unwrap_err();
+        assert_eq!(err, enc(CannotChallenge { messageId: id, status: STATUS_PENDING }));
+    }
+
+    #[test]
+    fn test_challenge_message_expired() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+
+        // Advance past challenge period (3600)
+        vm.set_block_timestamp(vm.block_timestamp() + 4000);
+
+        let challenger = Address::from([0xBBu8; 20]);
+        vm.set_sender(challenger);
+        let err = hub.challenge_message(id).unwrap_err();
+        assert_eq!(err, enc(ChallengeWindowExpired { messageId: id }));
+    }
+
+    // ── finalize_message ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_finalize_message() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+
+        // Advance past challenge period
+        vm.set_block_timestamp(vm.block_timestamp() + 4000);
+
+        vm.set_sender(relayer);
+        hub.finalize_message(id).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_CONFIRMED);
+
+        // Verify relayer success counter incremented
+        let (_active, _stake, deliveries) = hub.get_relayer_info(relayer);
+        assert_eq!(deliveries, U256::from(1));
+    }
+
+    #[test]
+    fn test_finalize_message_too_early() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+
+        // Still within challenge window — finalize should fail
+        let err = hub.finalize_message(id).unwrap_err();
+        // Just check it's the right error type (starts with ChallengeWindowNotExpired selector)
+        let expected_sel = &enc(ChallengeWindowNotExpired {
+            messageId: U256::ZERO,
+            deadline: U256::ZERO,
+        })[..4];
+        assert_eq!(&err[..4], expected_sel, "expected ChallengeWindowNotExpired error");
+        assert_eq!(err[4..36], {
+            let mut buf = [0u8; 32];
+            let id_bytes = U256::from(1).to_be_bytes::<32>();
+            buf.copy_from_slice(&id_bytes);
+            buf
+        }, "messageId should be 1");
+    }
+
+    #[test]
+    fn test_finalize_message_not_relayed() {
+        let (vm, mut hub, _owner) = setup();
+        let id = send_msg(&vm, &mut hub, 500);
+
+        let err = hub.finalize_message(id).unwrap_err();
+        assert_eq!(err, enc(AlreadyRelayed { messageId: id }));
+    }
+
+    #[test]
+    fn test_finalize_message_nonexistent() {
+        let (_vm, mut hub, _owner) = setup();
+        let err = hub.finalize_message(U256::from(999)).unwrap_err();
+        assert_eq!(err, enc(MessageNotFound { messageId: U256::from(999) }));
+    }
+
+    // ── withdraw_protocol_fees ──────────────────────────────────────────────
+
+    #[test]
+    fn test_withdraw_protocol_fees() {
+        let (vm, mut hub, owner) = setup();
+        fund_contract(&vm);
+        send_msg(&vm, &mut hub, 500);
+
+        vm.set_sender(owner);
+        hub.withdraw_protocol_fees().unwrap();
+        assert_eq!(hub.protocol_fee_balance(), U256::ZERO);
+    }
+
+    #[test]
+    fn test_withdraw_protocol_fees_not_owner() {
+        let (vm, mut hub, _owner) = setup();
+        send_msg(&vm, &mut hub, 500);
+
+        let non_owner = Address::from([0x99u8; 20]);
+        vm.set_sender(non_owner);
+        let err = hub.withdraw_protocol_fees().unwrap_err();
+        assert_eq!(err, enc(Unauthorized { caller: non_owner }));
+    }
+
+    #[test]
+    fn test_withdraw_protocol_fees_nothing() {
+        let (_vm, mut hub, _owner) = setup();
+        let err = hub.withdraw_protocol_fees().unwrap_err();
+        assert_eq!(err, enc(NothingToWithdraw {}));
+    }
+
+    // ── get_message_status ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_get_message_status_pending() {
+        let (vm, mut hub, _owner) = setup();
+        let id = send_msg(&vm, &mut hub, 500);
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_PENDING);
+    }
+
+    #[test]
+    fn test_get_message_status_not_found() {
+        let (vm, hub, _owner) = setup();
+        let err = hub.get_message_status(U256::from(999)).unwrap_err();
+        assert_eq!(err, enc(MessageNotFound { messageId: U256::from(999) }));
+    }
+
+    // ── view functions ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_calculate_fee() {
+        let (vm, hub, _owner) = setup();
+        assert_eq!(hub.calculate_fee(84532), U256::from(500));
+        assert_eq!(hub.calculate_fee(99999), U256::ZERO);
+    }
+
+    #[test]
+    fn test_is_active_relayer() {
+        let (vm, mut hub, _owner) = setup();
+        let relayer = vm.msg_sender();
+
+        assert!(!hub.is_active_relayer(relayer));
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+        assert!(hub.is_active_relayer(relayer));
+    }
+
+    #[test]
+    fn test_get_relayer_info() {
+        let (vm, mut hub, _owner) = setup();
+        let relayer = vm.msg_sender();
+
+        let (active, stake, deliveries) = hub.get_relayer_info(relayer);
+        assert!(!active);
+        assert_eq!(stake, U256::ZERO);
+        assert_eq!(deliveries, U256::ZERO);
+
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        let (active, stake, deliveries) = hub.get_relayer_info(relayer);
+        assert!(active);
+        assert_eq!(stake, U256::from(200));
+        assert_eq!(deliveries, U256::ZERO);
+    }
+
+    #[test]
+    fn test_initial_view_values() {
+        let vm = TestVM::new();
+        let hub = MessageHub::from(&vm);
+
+        assert_eq!(hub.owner(), Address::ZERO);
+        assert_eq!(hub.min_stake(), U256::ZERO);
+        assert_eq!(hub.challenge_period(), U256::ZERO);
+        assert_eq!(hub.message_count(), U256::ZERO);
+        assert_eq!(hub.protocol_fee_balance(), U256::ZERO);
+    }
+
+    // ── full lifecycle ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_full_lifecycle_pending_relayed_confirmed() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        // Register relayer
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        // Send message
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_PENDING);
+
+        // Relay
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_RELAYED);
+
+        // Advance past challenge window
+        vm.set_block_timestamp(vm.block_timestamp() + 4000);
+
+        // Finalize
+        hub.finalize_message(id).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_CONFIRMED);
+    }
+
+    #[test]
+    fn test_full_lifecycle_pending_relayed_failed() {
+        let (vm, mut hub, _owner) = setup();
+        fund_contract(&vm);
+
+        // Register relayer
+        let relayer = Address::from([0x10u8; 20]);
+        vm.set_sender(relayer);
+        vm.set_value(U256::from(200));
+        hub.register_relayer().unwrap();
+
+        // Send message
+        vm.set_sender(Address::from([0xAAu8; 20]));
+        let id = send_msg(&vm, &mut hub, 500);
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_PENDING);
+
+        // Relay
+        vm.set_sender(relayer);
+        hub.confirm_delivery(id, Bytes::from(vec![])).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_RELAYED);
+
+        // Challenge
+        let challenger = Address::from([0xBBu8; 20]);
+        vm.set_sender(challenger);
+        hub.challenge_message(id).unwrap();
+        assert_eq!(hub.get_message_status(id).unwrap(), STATUS_FAILED);
+    }
+}
