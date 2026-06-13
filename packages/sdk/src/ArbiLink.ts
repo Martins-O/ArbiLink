@@ -14,7 +14,7 @@ import { parseStatusCode, resolveChainId } from './utils';
  * // With a signer (full read/write access)
  * const arbiLink = new ArbiLink(signer);
  *
- * // With a provider (read-only: getMessageStatus, calculateFee)
+ * // With a provider (read-only: getMessageStatus)
  * const arbiLink = new ArbiLink(provider);
  * ```
  */
@@ -25,7 +25,6 @@ export class ArbiLink {
   private readonly iface: ethers.Interface;
 
   constructor(signerOrProvider: ethers.Signer | ethers.Provider) {
-    // Distinguish signer from provider: signers expose `getAddress()`
     const isSigner = typeof (signerOrProvider as ethers.Signer).getAddress === 'function';
 
     if (isSigner) {
@@ -75,7 +74,7 @@ export class ArbiLink {
     this.requireSigner();
 
     const chainId = resolveChainId(params.to);
-    const fee     = params.fee ?? await this.calculateFee(chainId);
+    if (!params.fee) throw new ArbiLinkError('fee is required. Provide the fee in wei (call calculateFee or fetch from hub config).');
 
     let tx: ethers.TransactionResponse;
     try {
@@ -83,7 +82,7 @@ export class ArbiLink {
         chainId,
         params.target,
         params.data,
-        { value: fee },
+        { value: params.fee },
       ) as ethers.TransactionResponse;
     } catch (err) {
       throw ArbiLinkError.from(err, `Failed to send message to chain ${chainId}`);
@@ -92,7 +91,6 @@ export class ArbiLink {
     const receipt = await tx.wait();
     if (!receipt) throw new ArbiLinkError('Transaction receipt is null – the tx may have been dropped');
 
-    // Parse MessageSent event to extract the assigned message ID
     for (const log of receipt.logs) {
       try {
         const parsed = this.iface.parseLog({ topics: [...log.topics], data: log.data });
@@ -114,13 +112,10 @@ export class ArbiLink {
   /**
    * Query the current status and metadata of a message.
    *
-   * Fetches the status code from the hub and enriches it with data from
-   * `MessageSent` and `MessageConfirmed` event logs.
-   *
    * @example
    * ```typescript
    * const msg = await arbiLink.getMessageStatus(messageId);
-   * console.log(msg.status);           // 'pending' | 'confirmed'
+   * console.log(msg.status);           // 'pending' | 'relayed' | 'failed'
    * console.log(msg.destinationChain); // 11155111
    * ```
    */
@@ -129,7 +124,6 @@ export class ArbiLink {
       const statusCode = await this.messageHub.getMessageStatus(messageId) as bigint;
       const status: MessageStatus = parseStatusCode(Number(statusCode));
 
-      // Enrich from MessageSent event
       const sentFilter = this.messageHub.filters['MessageSent'](messageId);
       const sentLogs   = await this.messageHub.queryFilter(sentFilter);
 
@@ -148,23 +142,6 @@ export class ArbiLink {
         feePaid          = e.args.fee              as bigint;
       }
 
-      // Enrich relayer from MessageRelayed or MessageConfirmed events
-      let relayer: string | undefined;
-      if (status === 'relayed' || status === 'confirmed') {
-        const relayedFilter = this.messageHub.filters['MessageRelayed'](messageId);
-        const relayedLogs   = await this.messageHub.queryFilter(relayedFilter);
-        if (relayedLogs.length > 0) {
-          relayer = (relayedLogs[0] as ethers.EventLog).args.relayer as string;
-        } else {
-          // Fallback to MessageConfirmed for already-finalized messages
-          const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
-          const confirmedLogs   = await this.messageHub.queryFilter(confirmedFilter);
-          if (confirmedLogs.length > 0) {
-            relayer = (confirmedLogs[0] as ethers.EventLog).args.relayer as string;
-          }
-        }
-      }
-
       return {
         id: messageId,
         status,
@@ -173,45 +150,25 @@ export class ArbiLink {
         target,
         data,
         feePaid,
-        relayer,
       };
     } catch (err) {
       throw ArbiLinkError.from(err, `Failed to fetch status for message #${messageId}`);
     }
   }
 
-  // ── Core: fee ──────────────────────────────────────────────────────────────
-
-  /**
-   * Fetch the base fee (in wei) required to send a message to `chainId`.
-   *
-   * @example
-   * ```typescript
-   * const fee = await arbiLink.calculateFee(11155111);
-   * console.log(formatEth(fee)); // "0.001 ETH"
-   * ```
-   */
-  async calculateFee(chainId: number): Promise<bigint> {
-    try {
-      return await this.messageHub.calculateFee(chainId) as bigint;
-    } catch (err) {
-      throw ArbiLinkError.from(err, `Failed to fetch fee for chain ${chainId}`);
-    }
-  }
-
   // ── Core: watch ────────────────────────────────────────────────────────────
 
   /**
-   * Subscribe to confirmation events for a given message.
+   * Subscribe to status changes for a given message by polling.
    *
-   * The callback fires when a `MessageConfirmed` event is emitted for this
-   * message ID. Call the returned function to unsubscribe.
+   * The callback fires whenever the message status changes. Call the returned
+   * function to unsubscribe.
    *
    * @example
    * ```typescript
    * const unwatch = arbiLink.watchMessage(messageId, (msg) => {
    *   console.log('Update:', msg.status);
-   *   if (msg.status === 'confirmed') unwatch();
+   *   if (msg.status === 'relayed' || msg.status === 'failed') unwatch();
    * });
    * ```
    */
@@ -220,8 +177,7 @@ export class ArbiLink {
     callback: (message: Message) => void,
     _options: WatchOptions = {},
   ): () => void {
-    const relayedFilter   = this.messageHub.filters['MessageRelayed'](messageId);
-    const confirmedFilter = this.messageHub.filters['MessageConfirmed'](messageId);
+    const filter = this.messageHub.filters['MessageSent'](messageId);
 
     const listener = async (): Promise<void> => {
       try {
@@ -232,23 +188,14 @@ export class ArbiLink {
       }
     };
 
-    this.messageHub.on(relayedFilter, listener);
-    this.messageHub.on(confirmedFilter, listener);
+    this.messageHub.on(filter, listener);
 
     return () => {
-      this.messageHub.off(relayedFilter, listener);
-      this.messageHub.off(confirmedFilter, listener);
+      this.messageHub.off(filter, listener);
     };
   }
 
   // ── Relayer helpers ────────────────────────────────────────────────────────
-
-  /**
-   * Check whether `address` is a registered, active relayer.
-   */
-  async isActiveRelayer(address: string): Promise<boolean> {
-    return await this.messageHub.isActiveRelayer(address) as boolean;
-  }
 
   /**
    * Register the signer as a relayer by staking the required ETH.
@@ -277,20 +224,6 @@ export class ArbiLink {
   // ── Hub info ───────────────────────────────────────────────────────────────
 
   /**
-   * Total number of messages sent through the hub.
-   */
-  async messageCount(): Promise<bigint> {
-    return await this.messageHub.messageCount() as bigint;
-  }
-
-  /**
-   * The hub owner address.
-   */
-  async owner(): Promise<string> {
-    return await this.messageHub.owner() as string;
-  }
-
-  /**
    * Minimum stake (wei) required to register as a relayer.
    */
   async minStake(): Promise<bigint> {
@@ -298,12 +231,12 @@ export class ArbiLink {
   }
 
   /**
-   * Fetch relayer info: active status, stake amount, and successful delivery count.
+   * Fetch relayer info: active status and stake amount.
    */
   async getRelayerInfo(address: string): Promise<RelayerInfo> {
-    const [active, stake, successfulDeliveries] =
-      await this.messageHub.getRelayerInfo(address) as [boolean, bigint, bigint];
-    return { active, stake, successfulDeliveries };
+    const [active, stake] =
+      await this.messageHub.getRelayerInfo(address) as [boolean, bigint];
+    return { active, stake };
   }
 
   /**
@@ -316,10 +249,10 @@ export class ArbiLink {
   }
 
   /**
-   * Fetch the current challenge period in seconds.
+   * Fetch the protocol fee balance (wei).
    */
-  async challengePeriod(): Promise<bigint> {
-    return await this.messageHub.challengePeriod() as bigint;
+  async protocolFeeBalance(): Promise<bigint> {
+    return await this.messageHub.protocolFeeBalance() as bigint;
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────

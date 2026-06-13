@@ -72,22 +72,15 @@ vi.mock('ethers', () => {
       this._address = address;
     }
     get sendMessage()           { return fakeContract.get('sendMessage'); }
-    get calculateFee()          { return fakeContract.get('calculateFee'); }
     get getMessageStatus()      { return fakeContract.get('getMessageStatus'); }
-    get isActiveRelayer()       { return fakeContract.get('isActiveRelayer'); }
-    get messageCount()          { return fakeContract.get('messageCount'); }
-    get owner()                 { return fakeContract.get('owner'); }
     get minStake()              { return fakeContract.get('minStake'); }
     get getRelayerInfo()        { return fakeContract.get('getRelayerInfo'); }
     get withdrawProtocolFees()  { return fakeContract.get('withdrawProtocolFees'); }
-    get challengePeriod()       { return fakeContract.get('challengePeriod'); }
     get registerRelayer()       { return fakeContract.get('registerRelayer'); }
     get exitRelayer()           { return fakeContract.get('exitRelayer'); }
     get filters() {
       return {
         get MessageSent()      { return fakeContract.get('filter_MessageSent'); },
-        get MessageRelayed()   { return fakeContract.get('filter_MessageRelayed'); },
-        get MessageConfirmed() { return fakeContract.get('filter_MessageConfirmed'); },
       };
     }
     get queryFilter()           { return fakeContract.get('queryFilter'); }
@@ -167,11 +160,10 @@ describe('ArbiLink', () => {
       const signer = new ethers.Signer();
       const arbiLink = new ArbiLink(signer as unknown as ethers.Signer);
 
-      mock$('calculateFee').mockResolvedValue(1000000n);
       const tx = { wait: vi.fn().mockResolvedValue({ logs: [] }) };
       mock$('sendMessage').mockResolvedValue(tx);
 
-      await expect(arbiLink.sendMessage({ to: 'base', target: '0x1234', data: '0x' })).rejects.toThrow('MessageSent event not found');
+      await expect(arbiLink.sendMessage({ to: 'base', target: '0x1234', data: '0x', fee: 1000000n })).rejects.toThrow('MessageSent event not found');
       expect(mock$('sendMessage')).toHaveBeenCalledWith(84532, '0x1234', '0x', { value: 1000000n });
     });
   });
@@ -182,35 +174,12 @@ describe('ArbiLink', () => {
       const provider = new ethers.JsonRpcProvider();
       const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
 
-      mock$('getMessageStatus').mockResolvedValue(2n);
+      mock$('getMessageStatus').mockResolvedValue(1n);
       mock$('queryFilter').mockResolvedValue([]);
 
       const msg = await arbiLink.getMessageStatus(42n);
-      expect(msg.status).toBe('confirmed');
+      expect(msg.status).toBe('relayed');
       expect(msg.id).toBe(42n);
-    });
-  });
-
-  describe('calculateFee', () => {
-    it('returns fee from contract', async () => {
-      const { ethers } = await import('ethers');
-      const provider = new ethers.JsonRpcProvider();
-      const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
-
-      mock$('calculateFee').mockResolvedValue(500000n);
-      const fee = await arbiLink.calculateFee(11155111);
-      expect(fee).toBe(500000n);
-    });
-  });
-
-  describe('isActiveRelayer', () => {
-    it('returns true when active', async () => {
-      const { ethers } = await import('ethers');
-      const provider = new ethers.JsonRpcProvider();
-      const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
-
-      mock$('isActiveRelayer').mockResolvedValue(true);
-      expect(await arbiLink.isActiveRelayer('0x1234')).toBe(true);
     });
   });
 
@@ -251,9 +220,9 @@ describe('ArbiLink', () => {
       const provider = new ethers.JsonRpcProvider();
       const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
 
-      mock$('getRelayerInfo').mockResolvedValue([true, 1000000000000000000n, 5n]);
+      mock$('getRelayerInfo').mockResolvedValue([true, 1000000000000000000n]);
       const info = await arbiLink.getRelayerInfo('0x1234');
-      expect(info).toEqual({ active: true, stake: 1000000000000000000n, successfulDeliveries: 5n });
+      expect(info).toEqual({ active: true, stake: 1000000000000000000n });
     });
   });
 
@@ -267,22 +236,6 @@ describe('ArbiLink', () => {
   });
 
   describe('view methods', () => {
-    it('messageCount returns count', async () => {
-      const { ethers } = await import('ethers');
-      const provider = new ethers.JsonRpcProvider();
-      const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
-      mock$('messageCount').mockResolvedValue(100n);
-      expect(await arbiLink.messageCount()).toBe(100n);
-    });
-
-    it('owner returns address', async () => {
-      const { ethers } = await import('ethers');
-      const provider = new ethers.JsonRpcProvider();
-      const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
-      mock$('owner').mockResolvedValue('0x000000000000000000000000000000000000dEaD');
-      expect(await arbiLink.owner()).toBe('0x000000000000000000000000000000000000dEaD');
-    });
-
     it('minStake returns stake', async () => {
       const { ethers } = await import('ethers');
       const provider = new ethers.JsonRpcProvider();
@@ -290,33 +243,23 @@ describe('ArbiLink', () => {
       mock$('minStake').mockResolvedValue(1000000000000000000n);
       expect(await arbiLink.minStake()).toBe(1000000000000000000n);
     });
-
-    it('challengePeriod returns period', async () => {
-      const { ethers } = await import('ethers');
-      const provider = new ethers.JsonRpcProvider();
-      const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
-      mock$('challengePeriod').mockResolvedValue(300n);
-      expect(await arbiLink.challengePeriod()).toBe(300n);
-    });
   });
 
   describe('watchMessage', () => {
-    it('subscribes to events and unsubscribes', async () => {
+    it('subscribes to MessageSent event and unsubscribes', async () => {
       const { ethers } = await import('ethers');
       const provider = new ethers.JsonRpcProvider();
       const arbiLink = new ArbiLink(provider as unknown as ethers.providers.JsonRpcProvider);
 
-      mock$('filter_MessageRelayed').mockReturnValue({});
-      mock$('filter_MessageConfirmed').mockReturnValue({});
+      mock$('filter_MessageSent').mockReturnValue({});
 
       const unwatch = arbiLink.watchMessage(42n, vi.fn());
 
-      expect(mock$('on')).toHaveBeenCalledTimes(2);
-      expect(mock$('filter_MessageRelayed')).toHaveBeenCalledWith(42n);
-      expect(mock$('filter_MessageConfirmed')).toHaveBeenCalledWith(42n);
+      expect(mock$('on')).toHaveBeenCalledTimes(1);
+      expect(mock$('filter_MessageSent')).toHaveBeenCalledWith(42n);
 
       unwatch();
-      expect(mock$('off')).toHaveBeenCalledTimes(2);
+      expect(mock$('off')).toHaveBeenCalledTimes(1);
     });
   });
 });

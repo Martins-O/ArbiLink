@@ -147,7 +147,6 @@ async function relayMessage(
   try {
     const hubTx = await hub.confirmDelivery(
       message.id,
-      proof,  // execution proof (currently unused in hub but included for future use)
     ) as ethers.TransactionResponse;
     const hubReceipt = await hubTx.wait();
     console.log(`  ✓  confirmDelivery mined: ${hubReceipt?.hash}`);
@@ -229,7 +228,7 @@ async function main(): Promise<void> {
   const hub = new ethers.Contract(HUB_ADDRESS, MessageHubABI, relayerWallet);
 
   // ── Ensure registered as relayer ──────────────────────────────────────────
-  const isActive = await hub.isActiveRelayer(relayerWallet.address) as boolean;
+  const [isActive] = await hub.getRelayerInfo(relayerWallet.address) as [boolean, bigint];
   if (!isActive) {
     const minStake = await hub.minStake() as bigint;
     console.log(`📝  Registering as relayer (stake: ${ethers.formatEther(minStake)} ETH) ...`);

@@ -16,7 +16,7 @@ export interface ChainConfig {
 // ── Message types ─────────────────────────────────────────────────────────────
 
 /** On-chain status codes (matches STATUS_* constants in MessageHub) */
-export type MessageStatus = 'pending' | 'relayed' | 'confirmed' | 'failed';
+export type MessageStatus = 'pending' | 'relayed' | 'failed';
 
 /** Full message record as returned by the SDK */
 export interface Message {
@@ -32,8 +32,6 @@ export interface Message {
   data?: string;
   /** Protocol fee paid (in wei) — populated from MessageSent event logs */
   feePaid?: bigint;
-  /** Relayer address, present once a relayer confirms delivery */
-  relayer?: string;
 }
 
 // ── SDK parameter types ───────────────────────────────────────────────────────
@@ -59,7 +57,6 @@ export interface WatchOptions {
 export interface RelayerInfo {
   active: boolean;
   stake: bigint;
-  successfulDeliveries: bigint;
 }
 
 // ── Error ─────────────────────────────────────────────────────────────────────

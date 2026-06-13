@@ -22,9 +22,9 @@ Arbitrum Sepolia (Source Chain)
 │     │  - Sets status = PENDING                          │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
-                     │
-                     │  Off-chain: Relayer watches MessageSent
-                     ▼
+                      │
+                      │  Off-chain: Relayer watches MessageSent
+                      ▼
 ┌─────────────────────────────────────────────────────────┐
 │  Relayer Node (off-chain, staked)                       │
 │     │  - Listens to Arbitrum Sepolia events             │
@@ -32,8 +32,8 @@ Arbitrum Sepolia (Source Chain)
 │     │  - Signs execution proof (ECDSA)                  │
 │     │  - Calls receiveMessage() on destination          │
 └─────────────────────────────────────────────────────────┘
-                     │
-                     ▼
+                      │
+                      ▼
 Destination Chain (Ethereum / Base / Polygon / …)
 ┌─────────────────────────────────────────────────────────┐
 │  ArbiLinkReceiver.sol                                   │
@@ -48,16 +48,15 @@ Destination Chain (Ethereum / Base / Polygon / …)
 │     │  - Executes arbitrary logic                       │
 │     │  - msg.sender = ArbiLinkReceiver                  │
 └─────────────────────────────────────────────────────────┘
-                     │
-                     │  Relayer reports back
-                     ▼
+                      │
+                      │  Relayer reports back
+                      ▼
 ┌─────────────────────────────────────────────────────────┐
 │  MessageHub (Arbitrum Sepolia)                          │
 │     │  - confirmDelivery(messageId)                     │
-│     │  - Emits MessageRelayed                           │
 │     │  - Starts 5-min challenge window                  │
-│     │  - After window: status = CONFIRMED               │
-│     │  - Relayer stake returned + fee paid              │
+│     │  - After window: status stays RELAYED             │
+│     │  - Relayer reward paid immediately on confirm     │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -68,7 +67,9 @@ Destination Chain (Ethereum / Base / Polygon / …)
 | **Sent** | MessageHub | `MessageSent` | Instant |
 | **Relayed** | ArbiLinkReceiver | `MessageReceived` | ~2–5 seconds |
 | **Challenge Window** | MessageHub | — | 300 seconds |
-| **Confirmed** | MessageHub | `MessageFinalized` | After window |
+| **Final** | MessageHub | — | After window |
+
+**Status codes:** `0` = PENDING, `1` = RELAYED, `3` = FAILED
 
 ## Security Model
 
@@ -81,13 +82,13 @@ ArbiLink uses an **optimistic** approach — messages are executed immediately o
 3. A 5-minute challenge window opens
 4. Anyone can call `challengeMessage(messageId)` if they believe the delivery was fraudulent
 5. If challenged, the relay is invalidated — relayer is **slashed**, stake goes to challenger
-6. If unchallenged: window closes
-7. After window closes: `finalizeMessage()` → `CONFIRMED`, stake returned
+6. If unchallenged: message stays in `RELAYED` state; relayer keeps the reward
 
 ### Relayer Incentives
 
 ```
-Relayer earns:  message.fee (paid by sender)
+Relayer earns:  message.fee × 80% (paid by sender)
+Remaining 20%: credited to protocol fees (withdrawable by owner)
 Relayer risks:  RELAYER_STAKE (0.1 ETH) — slashed on fraud
 
 Expected value (honest):    fee × messages_delivered
@@ -154,7 +155,7 @@ impl MessageHub {
 | Metric | Solidity | Stylus (Rust) |
 |--------|----------|---------------|
 | Gas (send_message) | ~80,000 | ~8,000 |
-| Bytecode size | ~12 KB | ~45 KB (compressed WASM) |
+| Bytecode size | ~12 KB | ~24 KB (compressed WASM) |
 | Memory safety | No | Yes (Rust borrow checker) |
 | Execution speed | EVM | WASM (~10×) |
 
@@ -162,11 +163,10 @@ impl MessageHub {
 
 The `@arbilink/sdk` abstracts the ABI calls and provides:
 
-1. **Fee calculation** — calls `calculateFee()` on the hub and caches result
-2. **Message encoding** — handles ABI encoding of `sendMessage` params
-3. **Event parsing** — extracts `messageId` from `MessageSent` log
-4. **Status polling** — wraps `get_message()` with exponential backoff
-5. **Watch subscriptions** — `setInterval` wrapper around `getMessageStatus`
+1. **Message encoding** — handles ABI encoding of `sendMessage` params
+2. **Event parsing** — extracts `messageId` from `MessageSent` log
+3. **Status polling** — wraps `getMessageStatus()` with polling
+4. **Watch subscriptions** — event-based wrapper around `getMessageStatus`
 
 ```typescript
 // Internally, sendMessage does:

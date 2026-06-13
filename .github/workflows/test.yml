@@ -20,7 +20,7 @@ jobs:
         with:
           toolchain: 1.93.0
           targets: wasm32-unknown-unknown
-      - run: cargo test --lib
+      - run: cargo test --lib --features testing
         working-directory: message-hub
 
   sdk:
