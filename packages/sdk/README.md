@@ -37,7 +37,7 @@ console.log('Message sent! ID:', messageId);
 
 const unwatch = arbiLink.watchMessage(messageId, (msg) => {
   console.log('Status update:', msg.status);
-  if (msg.status === 'confirmed') {
+  if (msg.status === 'relayed') {
     console.log('Message delivered!');
     unwatch();
   }
@@ -79,45 +79,25 @@ const messageId = await arbiLink.sendMessage({
 ```typescript
 const msg = await arbiLink.getMessageStatus(1n);
 
-console.log(msg.status);           // 'pending' | 'relayed' | 'confirmed' | 'failed'
+console.log(msg.status);           // 'pending' | 'relayed' | 'failed'
 console.log(msg.sender);           // address that sent the message
 console.log(msg.destinationChain); // numeric chain ID
 console.log(msg.feePaid);          // bigint (wei)
-console.log(msg.relayer);          // relayer address (once confirmed)
-```
-
----
-
-### `calculateFee(chainId)` → `Promise<bigint>`
-
-```typescript
-const fee = await arbiLink.calculateFee(11155111);
-console.log(formatEth(fee)); // "0.001 ETH"
+console.log(msg.relayer);          // relayer address (once relayed)
 ```
 
 ---
 
 ### `watchMessage(messageId, callback)` → `() => void`
 
-Subscribe to `MessageConfirmed` and `MessageChallenged` events. Returns an **unsubscribe** function.
+Returns an **unsubscribe** function.
 
 ```typescript
 const unwatch = arbiLink.watchMessage(messageId, (msg) => {
-  if (msg.status === 'confirmed' || msg.status === 'failed') {
+  if (msg.status === 'failed') {
     unwatch();
   }
 });
-```
-
----
-
-### `getChainInfo(chainId)` → `Promise<{ enabled, receiverAddress, baseFee } | null>`
-
-```typescript
-const info = await arbiLink.getChainInfo(11155111);
-console.log(info?.enabled);          // true
-console.log(info?.receiverAddress);  // '0x...'
-console.log(info?.baseFee);          // bigint
 ```
 
 ---
@@ -139,7 +119,7 @@ await arbiLink.exitRelayer();                            // withdraw & deregiste
 | `encodeCall({ abi, functionName, args })` | `string` (hex) | `encodeCall({ abi, functionName: 'mint', args: [...] })` |
 | `formatMessageId(id)` | `string` | `formatMessageId(42n)` → `'#000042'` |
 | `formatEth(wei)` | `string` | `formatEth(1_000_000_000_000_000n)` → `'0.001 ETH'` |
-| `statusLabel(status)` | `string` | `statusLabel('confirmed')` → `'Confirmed'` |
+| `statusLabel(status)` | `string` | `statusLabel(0)` → `'pending'` |
 | `estimateDeliveryTime(chainId)` | `number` (sec) | `estimateDeliveryTime(11155111)` |
 
 ---
@@ -161,7 +141,6 @@ await arbiLink.exitRelayer();                            // withdraw & deregiste
 2. **Relayers** watch for `MessageSent` events and deliver the message on the destination chain via `ArbiLinkReceiver.receiveMessage()`.
 3. The relayer submits an **ECDSA execution proof** and calls `confirmDelivery()` on the hub, opening a **5-minute challenge window**.
 4. Anyone can call `challengeMessage()` with a fraud proof during that window. A valid fraud proof **slashes the relayer's stake**.
-5. After the window closes without a challenge, `finalizeMessage()` marks the message as **confirmed**.
 
 ---
 
