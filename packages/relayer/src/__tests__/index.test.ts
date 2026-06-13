@@ -37,7 +37,7 @@ vi.mock('ethers', async () => {
     constructor(address: string, _abi: unknown[], _runner: unknown) {
       this.address = address;
     }
-    get isActiveRelayer()   { return getMockFn('isActiveRelayer'); }
+    get getRelayerInfo()    { return getMockFn('getRelayerInfo'); }
     get minStake()          { return getMockFn('minStake'); }
     get registerRelayer()   { return getMockFn('registerRelayer'); }
     get getMessageStatus()  { return getMockFn('getMessageStatus'); }

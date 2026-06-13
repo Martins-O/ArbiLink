@@ -12,7 +12,6 @@ import type { SimulationStep } from '../lib/types';
 
 const HUB_ABI = [
   'function sendMessage(uint32 destinationChain, address target, bytes data) payable returns (uint256)',
-  'function calculateFee(uint32 destinationChain) view returns (uint256)',
   'function getMessageStatus(uint256 id) view returns (uint8)',
 ];
 
@@ -98,7 +97,7 @@ export function useSendMessage() {
       setSenderAddress(sender);
 
       const hub  = new Contract(MESSAGE_HUB_ADDRESS, HUB_ABI, signer);
-      const fee  = await hub.calculateFee(destinationChainId) as bigint;
+      const fee  = 100000000000000n; // 0.0001 ETH hardcoded for demo
       const data = ethers.toUtf8Bytes('ArbiLink demo — live cross-chain message');
 
       const tx = await hub.sendMessage(
@@ -135,7 +134,7 @@ export function useSendMessage() {
       pollRef.current = setInterval(async () => {
         try {
           const status = Number(await readHub.getMessageStatus(messageId!));
-          if (status >= 1) {
+          if (status === 1 || status === 3) {
             stopAll();
             // Animate through the final steps quickly
             setCurrentStep(3);

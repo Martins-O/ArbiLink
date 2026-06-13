@@ -29,9 +29,7 @@ Sends a cross-chain message. Emits `MessageSent`.
 | `target` | `address` | Target contract on destination chain |
 | `data` | `bytes` | ABI-encoded call data |
 
-**Value:** Must be `≥ calculateFee(chainId)`. Excess is refunded.
-
-**Reverts** with `InvalidInput` if `target` is `Address::ZERO`.
+**Value:** Must cover the chain's base fee. Excess is credited to protocol fees.
 
 ---
 
@@ -50,15 +48,6 @@ function challengeMessage(uint256 messageId) external
 ```
 
 Challenge a claimed delivery. Callable by anyone during the challenge window.
-
----
-
-#### `finalizeMessage`
-```solidity
-function finalizeMessage(uint256 messageId) external
-```
-
-Finalize a message after the challenge window. Releases relayer stake return.
 
 ---
 
@@ -82,37 +71,10 @@ Deregister as a relayer. Stake is returned.
 
 #### `addChain`
 ```solidity
-function addChain(uint256 chainId, address receiver, uint256 fee) external
+function addChain(uint256 chainId, uint256 baseFee) external
 ```
 
-Owner-only. Register a new destination chain.
-
----
-
-#### `removeChain`
-```solidity
-function removeChain(uint256 chainId) external
-```
-
-Owner-only. Disable a destination chain. Emits `ChainRemoved`.
-
----
-
-#### `setMinStake`
-```solidity
-function setMinStake(uint256 newStake) external
-```
-
-Owner-only. Update the minimum relayer stake. Emits `MinStakeUpdated`.
-
----
-
-#### `setChallengePeriod`
-```solidity
-function setChallengePeriod(uint256 newPeriod) external
-```
-
-Owner-only. Update the fraud-proof challenge window duration. Emits `ChallengePeriodUpdated`.
+Owner-only. Register a new destination chain with its base fee.
 
 ---
 
@@ -121,16 +83,7 @@ Owner-only. Update the fraud-proof challenge window duration. Emits `ChallengePe
 function transferOwnership(address newOwner) external
 ```
 
-Owner-only. Initiates transfer to a new owner. Emits `OwnershipTransferStarted`.
-
----
-
-#### `acceptOwnership`
-```solidity
-function acceptOwnership() external
-```
-
-Pending owner completes the ownership transfer. Emits `OwnershipTransferred`.
+Owner-only. Transfers ownership immediately.
 
 ---
 
@@ -145,60 +98,21 @@ Owner-only. Withdraw accumulated protocol fees.
 
 ### Read Functions
 
-#### `calculateFee`
-```solidity
-function calculateFee(uint256 chainId) external view returns (uint256)
-```
-
-Returns the current fee in wei to send to `chainId`.
-
----
-
-#### `getMessage`
-```solidity
-function getMessage(uint256 messageId) external view returns (
-    address sender,
-    uint256 destination,
-    address target,
-    bytes   memory data,
-    uint256 value,
-    uint256 fee,
-    uint256 timestamp,
-    address relayer,
-    uint8   status
-)
-```
-
----
-
 #### `getMessageStatus`
 ```solidity
 function getMessageStatus(uint256 messageId) external view returns (uint8)
 ```
 
-Returns the numeric status code (`0`=Pending, `1`=Relayed, `2`=Confirmed, `3`=Failed).
+Returns the numeric status code (`0`=Pending, `1`=Relayed, `3`=Failed).
 
 ---
 
-#### `messageCount`
+#### `getRelayerInfo`
 ```solidity
-function messageCount() external view returns (uint256)
-```
-
-Total messages sent through the hub.
-
----
-
-#### `owner`
-```solidity
-function owner() external view returns (address)
-```
-
----
-
-#### `pendingOwner`
-```solidity
-function pendingOwner() external view returns (address)
+function getRelayerInfo(address relayer) external view returns (
+    bool    active,
+    uint256 stake
+)
 ```
 
 ---
@@ -212,30 +126,12 @@ Minimum stake in wei required to register as a relayer.
 
 ---
 
-#### `challengePeriod`
+#### `protocolFeeBalance`
 ```solidity
-function challengePeriod() external view returns (uint256)
+function protocolFeeBalance() external view returns (uint256)
 ```
 
-Challenge window duration in seconds.
-
----
-
-#### `isActiveRelayer`
-```solidity
-function isActiveRelayer(address relayer) external view returns (bool)
-```
-
----
-
-#### `getRelayerInfo`
-```solidity
-function getRelayerInfo(address relayer) external view returns (
-    bool    active,
-    uint256 stake,
-    uint256 successfulDeliveries
-)
-```
+Accumulated protocol fees available for withdrawal.
 
 ---
 

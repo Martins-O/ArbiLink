@@ -33,3 +33,4 @@ target/
 Cargo.lock
 out/
 cache/
+.npmrc

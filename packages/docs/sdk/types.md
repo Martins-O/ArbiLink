@@ -40,14 +40,13 @@ interface ChainConfig {
 ## `MessageStatus`
 
 ```typescript
-type MessageStatus = 'pending' | 'relayed' | 'confirmed' | 'failed';
+type MessageStatus = 'pending' | 'relayed' | 'failed';
 ```
 
 | Value | Description |
 |-------|-------------|
 | `'pending'` | Message sent on Arbitrum, waiting for a relayer |
-| `'relayed'` | Relayer submitted the message to the destination chain |
-| `'confirmed'` | Challenge window passed — delivery is final |
+| `'relayed'` | Relayer submitted the message to the destination chain (or challenge window passed) |
 | `'failed'` | Message was challenged or could not be delivered |
 
 ---
@@ -65,7 +64,7 @@ interface Message {
   target?: string;            // Target contract address on destination chain
   data?: string;              // ABI-encoded call data
   feePaid?: bigint;           // Protocol fee paid (in wei)
-  relayer?: string;           // Relayer address (present once relayed/confirmed)
+  relayer?: string;           // Relayer address (present once relayed)
 }
 ```
 
@@ -80,7 +79,7 @@ console.log(msg.id);                // 1n
 console.log(msg.sender);            // '0xabc...'
 console.log(msg.destinationChain);  // 11155111
 console.log(msg.target);            // '0x742d...'
-console.log(msg.status);            // 'confirmed'
+console.log(msg.status);            // 'relayed'
 console.log(msg.relayer);           // '0xdef...'
 ```
 
@@ -119,7 +118,6 @@ Relayer status and statistics, returned by `getRelayerInfo()`.
 interface RelayerInfo {
   active: boolean;
   stake: bigint;
-  successfulDeliveries: bigint;
 }
 ```
 

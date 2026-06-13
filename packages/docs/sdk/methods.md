@@ -66,30 +66,9 @@ async getMessageStatus(messageId: bigint): Promise<Message>
 ```typescript
 const msg = await arbiLink.getMessageStatus(42n);
 
-console.log(msg.status);            // 'pending' | 'relayed' | 'confirmed' | 'failed'
+console.log(msg.status);            // 'pending' | 'relayed' | 'failed'
 console.log(msg.sender);            // '0xabc...'
 console.log(msg.destinationChain);  // 11155111
-console.log(msg.relayer);           // '0xdef...' or undefined if not yet relayed
-```
-
----
-
-## `calculateFee(chainId)`
-
-Calculate the current fee in wei required to send a message to a given chain.
-
-```typescript
-async calculateFee(chainId: number): Promise<bigint>
-```
-
-### Example
-
-```typescript
-import { formatEther } from 'ethers';
-
-const fee = await arbiLink.calculateFee(11155111);
-console.log(`Fee: ${formatEther(fee)} ETH`);
-// → Fee: 0.0001 ETH
 ```
 
 ---
@@ -124,47 +103,13 @@ An **unsubscribe** function — call it to stop listening.
 const unsubscribe = arbiLink.watchMessage(messageId, (msg) => {
   console.log(`Status: ${msg.status}`);
 
-  if (msg.status === 'confirmed' || msg.status === 'failed') {
+  if (msg.status === 'failed') {
     unsubscribe(); // Stop polling
   }
 });
 
 // Or stop after 60 seconds
 setTimeout(unsubscribe, 60_000);
-```
-
----
-
-## `messageCount()`
-
-Get the total number of messages sent through the hub.
-
-```typescript
-async messageCount(): Promise<bigint>
-```
-
-### Example
-
-```typescript
-const total = await arbiLink.messageCount();
-console.log(`Total messages: ${total}`);
-```
-
----
-
-## `owner()`
-
-Get the hub owner address.
-
-```typescript
-async owner(): Promise<string>
-```
-
-### Example
-
-```typescript
-const owner = await arbiLink.owner();
-console.log(`Hub owner: ${owner}`);
 ```
 
 ---
@@ -186,42 +131,9 @@ console.log(`Min stake: ${formatEther(stake)} ETH`);
 
 ---
 
-## `challengePeriod()`
-
-Get the current challenge period in seconds.
-
-```typescript
-async challengePeriod(): Promise<bigint>
-```
-
-### Example
-
-```typescript
-const period = await arbiLink.challengePeriod();
-console.log(`Challenge window: ${period}s`);
-```
-
----
-
-## `getChainInfo(chainId)`
-
-Get configuration for a registered destination chain.
-
-```typescript
-async getChainInfo(chainId: number): Promise<...>
-```
-
-### Example
-
-```typescript
-const info = await arbiLink.getChainInfo(11155111);
-```
-
----
-
 ## `getRelayerInfo(address)`
 
-Fetch relayer details including stake and delivery count.
+Fetch relayer details including active status and stake.
 
 ```typescript
 async getRelayerInfo(address: string): Promise<RelayerInfo>
@@ -231,26 +143,18 @@ async getRelayerInfo(address: string): Promise<RelayerInfo>
 
 ```typescript
 const info = await arbiLink.getRelayerInfo('0xabc...');
-console.log(info.active);               // boolean
-console.log(info.stake);                // bigint (wei)
-console.log(info.successfulDeliveries); // bigint
+console.log(info.active);  // boolean
+console.log(info.stake);   // bigint (wei)
 ```
 
 ---
 
-## `isActiveRelayer(address)`
+## `protocolFeeBalance()`
 
-Check whether an address is currently a registered, staked relayer.
-
-```typescript
-async isActiveRelayer(address: string): Promise<boolean>
-```
-
-### Example
+Get the accumulated protocol fee balance in wei.
 
 ```typescript
-const active = await arbiLink.isActiveRelayer('0xabc...');
-console.log(`Is active relayer: ${active}`);
+async protocolFeeBalance(): Promise<bigint>
 ```
 
 ---
